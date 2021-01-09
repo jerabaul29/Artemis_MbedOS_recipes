@@ -10,6 +10,11 @@ void setup() {
 
 int main()
 {
+    constexpr uint32_t watchdog_timeout_ms = 5000;
+
+    Watchdog &watchdog = Watchdog::get_instance();
+    watchdog.start(watchdog_timeout_ms);
+    
     rtos::ThisThread::sleep_for(1000);
     
     char char_buffer[128];  // for generating timestamp cstrings
@@ -69,7 +74,23 @@ int main()
     Serial.end();
 
     // third, set the RTC time
-    set_time(posix_timestamp);
+    // here, let the user choose to set it or not, to allow some test whether RTC survives reseting
+    Serial.begin(57600);
+    Serial.println(F("set the timestamp? [y/n]"));
+    while (true){
+      if (Serial.available() > 0){
+        if (Serial.read() == 'y'){
+            Serial.println(F("Set!"));
+            set_time(posix_timestamp);
+            break;
+        }
+        else{
+          Serial.println(F("Do not set!"));
+          break;
+        }
+      }
+    }
+    Serial.end();
      
     while (true) {
         // get the current utc time from the rtc
@@ -97,5 +118,15 @@ int main()
         Serial.end();
 
         rtos::ThisThread::sleep_for(1000);
+
+        // different ways to restart the system; the RTC should survive system restart as long as power is not lost and no full reset is used
+
+        // watchdog reset
+        while (true){
+          // Watchdog::get_instance().kick();  // uncomment to reset watchdog; this would be an endless loop
+        }
+        
+        // RTC does not survive system reset!
+        NVIC_SystemReset();
     }
 }
