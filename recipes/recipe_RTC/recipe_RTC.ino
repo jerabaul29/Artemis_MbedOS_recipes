@@ -11,9 +11,6 @@ void setup() {
 int main()
 {
     constexpr uint32_t watchdog_timeout_ms = 5000;
-
-    Watchdog &watchdog = Watchdog::get_instance();
-    watchdog.start(watchdog_timeout_ms);
     
     rtos::ThisThread::sleep_for(1000);
     
