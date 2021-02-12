@@ -70,6 +70,7 @@ void setup(){
   Serial.println(F("booted"));
   delay(100);
 
+  /*
   // Enable power for the 9603N
   Serial.println(F("Enabling 9603N power..."));
   digitalWrite(iridiumPwrEN, HIGH); // Enable Iridium Power
@@ -100,6 +101,7 @@ void setup(){
   else{
     Serial.println(F("successful start of modem"));
   }
+  */
 }
 
 void loop(){
