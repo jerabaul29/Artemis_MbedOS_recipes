@@ -1,10 +1,29 @@
 #include "mbed.h"
 
+#include <Embedded_Template_Library.h>
+
 #include "etl/array.h"
 #include "etl/circular_buffer.h"
+#include "etl/vector.h"
 
 //////////////////////////////////////////////////
 // helper functions
+
+template<typename T, size_t size>
+void print_vector(const etl::vector<T, size> & vector){
+  Serial.print(F("vector: "));
+
+  for (auto && crrt_value : vector){
+    Serial.print(crrt_value);
+    Serial.print(F(" "));
+  }
+  Serial.println();
+  Serial.print(F("current size: "));
+  Serial.print(vector.size());
+  Serial.print(F(" out of capacity: "));
+  Serial.print(vector.capacity());
+  Serial.println();
+}
 
 template<typename T, size_t size>
 void print_array(const etl::array<T, size> & array){
@@ -25,6 +44,7 @@ void print_circular_buffer(const etl::circular_buffer<T, max_size> circular_buff
   Serial.print(circular_buffer.size());
   Serial.print(F(" , capacity "));
   Serial.print(circular_buffer.capacity());
+  Serial.println();
 }
 
 //////////////////////////////////////////////////
@@ -66,15 +86,24 @@ int main(){
 
   etl::circular_buffer<int, 16> circular_buffer;
 
-  print_circular_buffer(circular_buffer);
-
-  Serial.println(F("fill with 8 elements"));
-
   for (int i=0; i<8; i++){
     circular_buffer.push(i);
   }
 
   print_circular_buffer(circular_buffer);
+
+  //////////////////////////////////////////////////
+  Serial.println(F("working with vector"));
+
+  etl::vector<int, 32> vector;
+
+  vector.push_back(31);
+  vector.push_back(32);
+  vector.push_back(33);
+
+  print_vector(vector);
+
+  
 
   ////////////////////////////////////////////////// 
   while (true){
