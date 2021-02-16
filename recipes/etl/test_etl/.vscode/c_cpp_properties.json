@@ -1,0 +1,63 @@
+//
+// !!! WARNING !!! AUTO-GENERATED FILE!
+// PLEASE DO NOT MODIFY IT AND USE "platformio.ini":
+// https://docs.platformio.org/page/projectconf/section_env_build.html#build-flags
+//
+{
+    "configurations": [
+        {
+            "name": "PlatformIO",
+            "includePath": [
+                "/home/jrmet/Desktop/Git/Artemis_MbedOS_recipes/recipes/etl/test_etl/include",
+                "/home/jrmet/Desktop/Git/Artemis_MbedOS_recipes/recipes/etl/test_etl/src",
+                "/home/jrmet/.platformio/packages/framework-arduinoapollo3/cores/arduino",
+                "/home/jrmet/.platformio/packages/framework-arduinoapollo3/variants/SFE_ARTEMIS",
+                "/home/jrmet/.platformio/packages/framework-arduinoapollo3/cores/arduino/mbed-bridge",
+                "/home/jrmet/.platformio/packages/framework-arduinoapollo3/cores/arduino/mbed-bridge/cort-api",
+                "/home/jrmet/Desktop/Git/Artemis_MbedOS_recipes/recipes/etl/test_etl/lib/etl",
+                "/home/jrmet/.platformio/packages/tool-unity",
+                ""
+            ],
+            "browse": {
+                "limitSymbolsToIncludedHeaders": true,
+                "path": [
+                    "/home/jrmet/Desktop/Git/Artemis_MbedOS_recipes/recipes/etl/test_etl/include",
+                    "/home/jrmet/Desktop/Git/Artemis_MbedOS_recipes/recipes/etl/test_etl/src",
+                    "/home/jrmet/.platformio/packages/framework-arduinoapollo3/cores/arduino",
+                    "/home/jrmet/.platformio/packages/framework-arduinoapollo3/variants/SFE_ARTEMIS",
+                    "/home/jrmet/.platformio/packages/framework-arduinoapollo3/cores/arduino/mbed-bridge",
+                    "/home/jrmet/.platformio/packages/framework-arduinoapollo3/cores/arduino/mbed-bridge/cort-api",
+                    "/home/jrmet/Desktop/Git/Artemis_MbedOS_recipes/recipes/etl/test_etl/lib/etl",
+                    "/home/jrmet/.platformio/packages/tool-unity",
+                    ""
+                ]
+            },
+            "defines": [
+                "ARDUINO_ARCH_APOLLO3",
+                "PLATFORMIO=50004",
+                "ARDUINO_AM_AP3_SFE_BB_ARTEMIS",
+                "MBED_NO_GLOBAL_USING_DIRECTIVE",
+                "ARDUINO=10811",
+                "ARDUINO_ARCH_APOLLO3ARDUINO_ARCH_MBED",
+                "ARDUINO_ARCH_APOLLO3",
+                "MBED_NO_GLOBAL_USING_DIRECTIVE",
+                "CORDIO_ZERO_COPY_HCI",
+                ""
+            ],
+            "forcedInclude": [
+                "/home/jrmet/.platformio/packages/framework-arduinoapollo3/variants/SFE_ARTEMIS/mbed/mbed_config.h",
+                "/home/jrmet/.platformio/packages/framework-arduinoapollo3/cores/arduino/sdk/ArduinoSDK.h",
+                ""
+            ],
+            "compilerPath": "/home/jrmet/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gcc",
+            "compilerArgs": [
+                "-iprefix/home/jrmet/.platformio/packages/framework-arduinoapollo3/cores/",
+                "@/home/jrmet/.platformio/packages/framework-arduinoapollo3/variants/SFE_ARTEMIS/mbed/.c-flags",
+                "@/home/jrmet/.platformio/packages/framework-arduinoapollo3/variants/SFE_ARTEMIS/mbed/.includes",
+                "@/home/jrmet/.platformio/packages/framework-arduinoapollo3/variants/SFE_ARTEMIS/mbed/.c-symbols",
+                ""
+            ]
+        }
+    ],
+    "version": 4
+}
