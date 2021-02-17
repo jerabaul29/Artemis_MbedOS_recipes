@@ -133,6 +133,13 @@ void loop() {
     Serial.println(accel_ENU_ref.norm());
     Serial.print(F("accel ENU: "));
     print(accel_ENU_ref);
+
+    // where is the X-direction of the IMU pointing?
+    Vector imu_dir_x_ref_imu{1, 0, 0};
+    Vector imu_dir_x_ref_enu{};
+    rotate_vect_by_quat_R(imu_dir_x_ref_imu, quat_orientation, imu_dir_x_ref_enu);
+    Serial.print(F("IMU X-dir in ENU frame: "));
+    print(imu_dir_x_ref_enu);
   }
 }
 
