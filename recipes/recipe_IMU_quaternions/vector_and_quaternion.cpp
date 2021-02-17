@@ -37,8 +37,13 @@ float Quaternion::norm(void) const {
   return res;
 }
 
+float Quaternion::norm_squared(void) const {
+  float res = q0*q0 + q1*q1 + q2*q2 + q3*q3;
+  return res;
+}
+
 bool Quaternion::is_normed(float tol) const {
-  return (abs(this->norm() - 1) < tol);
+  return ((this->norm_squared() - 1) < tol);
 }
 
 void Quaternion::set(float q0, float q1, float q2, float q3){
@@ -92,6 +97,18 @@ void Vector::set(float v0, float v1, float v2){
   this->v0 = v0;
   this->v1 = v1;
   this->v2 = v2;
+}
+
+float Vector::norm(void) const{
+  return(sqrt(v0*v0 + v1*v1 + v2*v2));
+}
+
+float Vector::norm_squared(void) const{
+  return(v0*v0 + v1*v1 + v2*v2);
+}
+
+bool Vector::is_normed(void) const{
+  return(is_approx(this->norm_squared(), 1.0f));
 }
 
 bool Vector::operator==(Vector const & vect_in){
@@ -213,6 +230,20 @@ float quat_to_scalar_part(Quaternion const & quat_in){
   return res;
 }
 
+bool rot_theta_normed_axis_to_rot_quat(float const rot_theta_rad, Vector const & normed_rot_axis, Quaternion & quat_out){
+  float cos_theta = cos(rot_theta_rad);
+  float sin_theta = sin(rot_theta_rad);
+  quat_out.set(
+    cos_theta,
+    sin_theta * normed_rot_axis.v0, sin_theta * normed_rot_axis.v1, sin_theta * normed_rot_axis.v2
+  );
+
+  if (!normed_rot_axis.is_normed()){
+    return false;
+  }
+  return true;
+}
+
 // using Rodriguez method: faster, see https://gamedev.stackexchange.com/questions/28395/rotating-vector3-by-a-quaternion
 bool rotate_vect_by_quat_R(Vector const & vect_in, Quaternion const & quat_in, Vector & vect_out){
   Vector quat_vect_part{0, 0, 0};
@@ -304,6 +335,13 @@ bool vect_quat_library_self_diagnostic(void){
   v1.set(2, 4, 6);
   uassert(v1 == v3, "vect set fails");
 
+  uassert(is_approx(v3.norm(), sqrt(2*2 + 4*4 + 6*6)), "vect norm fails");
+
+  uassert(is_approx(v3.norm_squared(), 2*2 + 4*4 + 6*6), "vect norm_squared fails");
+
+  uassert(!v3.is_normed(), "vect is_normed fails");
+  uassert(Vector{1.0, 0, 0}.is_normed(), "vect is_normed fails");
+
   // test quaternions --------------------
   Quaternion q1 {0, 0, 0, 0};
   Quaternion q2 {1, 2, 3, 4};
@@ -322,6 +360,8 @@ bool vect_quat_library_self_diagnostic(void){
   uassert(q1 == q3, "quat conj fails");
 
   uassert(abs(q2.norm() - sqrt(1*1 + 2*2 + 3*3 + 4*4)) < default_tol, "quat norm fails");
+
+  uassert(is_approx(q2.norm_squared(), 1*1 + 2*2 + 3*3 + 4*4), "quat norm_squared fails");
 
   uassert(!q2.is_normed(), "quat is_normed fails");
 
@@ -399,36 +439,191 @@ bool vect_quat_library_self_diagnostic(void){
 
   uassert(2.5 == quat_to_scalar_part(q1), "quat_to_scalar_part fails");
 
+  bool flag_to_quat {false};
+
+  float angle_45_as_rads = 45.0f * pi;
+  float sqrt_1_over_3 = 0.5773502691896257f;
+  v1.set(sqrt_1_over_3, sqrt_1_over_3, sqrt_1_over_3);
+  flag_to_quat = rot_theta_normed_axis_to_rot_quat(angle_45_as_rads, v1, q1);
+  uassert(
+    (
+      (flag_to_quat)
+      &&
+      (
+        q1 == Quaternion(cos(angle_45_as_rads),
+                         sin(angle_45_as_rads)*sqrt_1_over_3,
+                         sin(angle_45_as_rads)*sqrt_1_over_3,
+                         sin(angle_45_as_rads)*sqrt_1_over_3)
+      )
+    ),
+    "rot_theta_normed_axis_to_rot_quat failed"
+  );
+
+  v1.set(sqrt_1_over_3, 0, sqrt_1_over_3);
+  flag_to_quat = rot_theta_normed_axis_to_rot_quat(angle_45_as_rads, v1, q1);
+  uassert(
+    (
+      (!flag_to_quat)
+      &&
+      (
+        q1 == Quaternion(cos(angle_45_as_rads),
+                         sin(angle_45_as_rads)*sqrt_1_over_3,
+                         0,
+                         sin(angle_45_as_rads)*sqrt_1_over_3)
+      )
+    ),
+    "rot_theta_normed_axis_to_rot_quat failed"
+  );
+
+  //--------------------
+
   bool return_flag_rotate_R {false};
   bool return_flag_rotate_Q {false};
 
+  // check identity with scaling --------------------
   v1.set(1, 0, 0);
   q1.set(1.5, 0, 0, 0);
   return_flag_rotate_R = rotate_vect_by_quat_R(v1, q1, v2);
   return_flag_rotate_Q = rotate_vect_by_quat_R(v1, q1, v3);
-  print(v2);
-  Serial.println(return_flag_rotate_R);
-  print(v3);
-  Serial.println(return_flag_rotate_Q);
   uassert(((!return_flag_rotate_R) && (v2 == Vector{2.25, 0, 0})), "rotate_vect_by_quat_R 1 fails");
   uassert(((!return_flag_rotate_Q) && (v3 == Vector{2.25, 0, 0})), "rotate_vect_by_quat_Q 1 fails");
 
-  v1.set(1, 0, 0);
-  q1.set(0, 0, 0, 0);
+  v1.set(0, 1, 0);
+  q1.set(1.5, 0, 0, 0);
   return_flag_rotate_R = rotate_vect_by_quat_R(v1, q1, v2);
   return_flag_rotate_Q = rotate_vect_by_quat_R(v1, q1, v3);
-  print(v2);
-  Serial.println(return_flag_rotate_R);
-  print(v3);
-  Serial.println(return_flag_rotate_Q);
-  uassert(((return_flag_rotate_R) && (v2 == Vector{2.25, 0, 0})), "rotate_vect_by_quat_R 1 fails");
-  uassert(((return_flag_rotate_Q) && (v3 == Vector{2.25, 0, 0})), "rotate_vect_by_quat_Q 1 fails");
+  uassert(((!return_flag_rotate_R) && (v2 == Vector{0, 2.25, 0})), "rotate_vect_by_quat_R 2 fails");
+  uassert(((!return_flag_rotate_Q) && (v3 == Vector{0, 2.25, 0})), "rotate_vect_by_quat_Q 2 fails");
+
+  v1.set(0, 0, 1);
+  q1.set(1.5, 0, 0, 0);
+  return_flag_rotate_R = rotate_vect_by_quat_R(v1, q1, v2);
+  return_flag_rotate_Q = rotate_vect_by_quat_R(v1, q1, v3);
+  uassert(((!return_flag_rotate_R) && (v2 == Vector{0, 0, 2.25})), "rotate_vect_by_quat_R 3 fails");
+  uassert(((!return_flag_rotate_Q) && (v3 == Vector{0, 0, 2.25})), "rotate_vect_by_quat_Q 3 fails");
+
+  // check identity --------------------
+  v1.set(1, 0, 0);
+  q1.set(1, 0, 0, 0);
+  return_flag_rotate_R = rotate_vect_by_quat_R(v1, q1, v2);
+  return_flag_rotate_Q = rotate_vect_by_quat_R(v1, q1, v3);
+  uassert(((return_flag_rotate_R) && (v2 == Vector{1, 0, 0})), "rotate_vect_by_quat_R 4 fails");
+  uassert(((return_flag_rotate_Q) && (v3 == Vector{1, 0, 0})), "rotate_vect_by_quat_Q 4 fails");
+
+  v1.set(0, 1, 0);
+  q1.set(1, 0, 0, 0);
+  return_flag_rotate_R = rotate_vect_by_quat_R(v1, q1, v2);
+  return_flag_rotate_Q = rotate_vect_by_quat_R(v1, q1, v3);
+  uassert(((return_flag_rotate_R) && (v2 == Vector{0, 1, 0})), "rotate_vect_by_quat_R 4 fails");
+  uassert(((return_flag_rotate_Q) && (v3 == Vector{0, 1, 0})), "rotate_vect_by_quat_Q 4 fails");
+
+  v1.set(0, 0, 1);
+  q1.set(1, 0, 0, 0);
+  return_flag_rotate_R = rotate_vect_by_quat_R(v1, q1, v2);
+  return_flag_rotate_Q = rotate_vect_by_quat_R(v1, q1, v3);
+  uassert(((return_flag_rotate_R) && (v2 == Vector{0, 0, 1})), "rotate_vect_by_quat_R 4 fails");
+  uassert(((return_flag_rotate_Q) && (v3 == Vector{0, 0, 1})), "rotate_vect_by_quat_Q 4 fails");
+
+  // cos(45) = sin(45) = sqrt(2)/2
+  float cs45 = sqrt(2.0f) / 2.0f;
+
+  // check rotations of (1, 0, 0) --------------------
+  v1.set(1, 0, 0);
+  q1.set(cs45, cs45, 0, 0);
+  return_flag_rotate_R = rotate_vect_by_quat_R(v1, q1, v2);
+  return_flag_rotate_Q = rotate_vect_by_quat_R(v1, q1, v3);
+  uassert(((return_flag_rotate_R) && (v2 == Vector{1, 0, 0})), "rotate_vect_by_quat_R 5 fails");
+  uassert(((return_flag_rotate_Q) && (v3 == Vector{1, 0, 0})), "rotate_vect_by_quat_Q 5 fails");
+
+  v1.set(1, 0, 0);
+  q1.set(cs45, 0, cs45, 0);
+  return_flag_rotate_R = rotate_vect_by_quat_R(v1, q1, v2);
+  return_flag_rotate_Q = rotate_vect_by_quat_R(v1, q1, v3);
+  uassert(((return_flag_rotate_R) && (v2 == Vector{0, 0, -1})), "rotate_vect_by_quat_R 6 fails");
+  uassert(((return_flag_rotate_Q) && (v3 == Vector{0, 0, -1})), "rotate_vect_by_quat_Q 6 fails");
+
+  v1.set(1, 0, 0);
+  q1.set(cs45, 0, 0, cs45);
+  return_flag_rotate_R = rotate_vect_by_quat_R(v1, q1, v2);
+  return_flag_rotate_Q = rotate_vect_by_quat_R(v1, q1, v3);
+  uassert(((return_flag_rotate_R) && (v2 == Vector{0, 1, 0})), "rotate_vect_by_quat_R 7 fails");
+  uassert(((return_flag_rotate_Q) && (v3 == Vector{0, 1, 0})), "rotate_vect_by_quat_Q 7 fails");
+
+  // check rotations of (0, 1, 0) --------------------
+  v1.set(0, 1, 0);
+  q1.set(cs45, cs45, 0, 0);
+  return_flag_rotate_R = rotate_vect_by_quat_R(v1, q1, v2);
+  return_flag_rotate_Q = rotate_vect_by_quat_R(v1, q1, v3);
+  uassert(((return_flag_rotate_R) && (v2 == Vector{0, 0, 1})), "rotate_vect_by_quat_R 8 fails");
+  uassert(((return_flag_rotate_Q) && (v3 == Vector{0, 0, 1})), "rotate_vect_by_quat_Q 8 fails");
+
+  v1.set(0, 1, 0);
+  q1.set(cs45, 0, cs45, 0);
+  return_flag_rotate_R = rotate_vect_by_quat_R(v1, q1, v2);
+  return_flag_rotate_Q = rotate_vect_by_quat_R(v1, q1, v3);
+  uassert(((return_flag_rotate_R) && (v2 == Vector{0, 1, 0})), "rotate_vect_by_quat_R 9 fails");
+  uassert(((return_flag_rotate_Q) && (v3 == Vector{0, 1, 0})), "rotate_vect_by_quat_Q 9 fails");
+
+  v1.set(0, 1, 0);
+  q1.set(cs45, 0, 0, cs45);
+  return_flag_rotate_R = rotate_vect_by_quat_R(v1, q1, v2);
+  return_flag_rotate_Q = rotate_vect_by_quat_R(v1, q1, v3);
+  uassert(((return_flag_rotate_R) && (v2 == Vector{-1, 0, 0})), "rotate_vect_by_quat_R 10 fails");
+  uassert(((return_flag_rotate_Q) && (v3 == Vector{-1, 0, 0})), "rotate_vect_by_quat_Q 10 fails");
+
+  // check rotations of (0, 0, 1) --------------------
+  v1.set(0, 0, 1);
+  q1.set(cs45, cs45, 0, 0);
+  return_flag_rotate_R = rotate_vect_by_quat_R(v1, q1, v2);
+  return_flag_rotate_Q = rotate_vect_by_quat_R(v1, q1, v3);
+  uassert(((return_flag_rotate_R) && (v2 == Vector{0, -1, 0})), "rotate_vect_by_quat_R 11 fails");
+  uassert(((return_flag_rotate_Q) && (v3 == Vector{0, -1, 0})), "rotate_vect_by_quat_Q 11 fails");
+
+  v1.set(0, 0, 1);
+  q1.set(cs45, 0, cs45, 0);
+  return_flag_rotate_R = rotate_vect_by_quat_R(v1, q1, v2);
+  return_flag_rotate_Q = rotate_vect_by_quat_R(v1, q1, v3);
+  uassert(((return_flag_rotate_R) && (v2 == Vector{1, 0, 0})), "rotate_vect_by_quat_R 12 fails");
+  uassert(((return_flag_rotate_Q) && (v3 == Vector{1, 0, 0})), "rotate_vect_by_quat_Q 12 fails");
+
+  v1.set(0, 0, 1);
+  q1.set(cs45, 0, 0, cs45);
+  return_flag_rotate_R = rotate_vect_by_quat_R(v1, q1, v2);
+  return_flag_rotate_Q = rotate_vect_by_quat_R(v1, q1, v3);
+  uassert(((return_flag_rotate_R) && (v2 == Vector{0, 0, 1})), "rotate_vect_by_quat_R 13 fails");
+  uassert(((return_flag_rotate_Q) && (v3 == Vector{0, 0, 1})), "rotate_vect_by_quat_Q 13 fails");
+
+  // check that agree on a few "random" rotations --------------------
+  float rot_theta;
+
+  // TODO: these are only partial tests; check that all ok with the boolean flags
+
+  v1.set(0, 0, 1);
+  rot_theta = 14.5f * pi / 180.0f;
+  rot_theta_normed_axis_to_rot_quat(rot_theta, v1, q1);
+  return_flag_rotate_R = rotate_vect_by_quat_R(v1, q1, v2);
+  return_flag_rotate_Q = rotate_vect_by_quat_R(v1, q1, v3);
+  uassert(v2 == v3, "rotate_vect_by_quat_R and return_flag_rotate_Q 1 do not agree");
+
+  v1.set(0, 1, 0);
+  rot_theta = 14.5f * pi / 180.0f;
+  rot_theta_normed_axis_to_rot_quat(rot_theta, v1, q1);
+  return_flag_rotate_R = rotate_vect_by_quat_R(v1, q1, v2);
+  return_flag_rotate_Q = rotate_vect_by_quat_R(v1, q1, v3);
+  uassert(v2 == v3, "rotate_vect_by_quat_R and return_flag_rotate_Q 1 do not agree");
+
+  v1.set(0.5, 0.25, sqrt(1 - 0.5*0.5 - 0.25*0.25));
+  rot_theta = 28.5f * pi / 180.0f;
+  rot_theta_normed_axis_to_rot_quat(rot_theta, v1, q1);
+  return_flag_rotate_R = rotate_vect_by_quat_R(v1, q1, v2);
+  return_flag_rotate_Q = rotate_vect_by_quat_R(v1, q1, v3);
+  uassert(v2 == v3, "rotate_vect_by_quat_R and return_flag_rotate_Q 1 do not agree");
 
   //--------------------------------------------------------------------------------
+
   Serial.println(F("finished, vect and quat operations a success"));
   delay(500);
 
   return true;
 }
-
 

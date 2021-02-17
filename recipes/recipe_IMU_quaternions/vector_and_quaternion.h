@@ -12,6 +12,7 @@
 
 //--------------------------------------------------------------------------------
 constexpr float default_tol = 1.0e-4;
+constexpr float pi = 3.141592653589793f;
 
 bool is_approx(float val_1, float val_2, float tol=default_tol);
 
@@ -33,6 +34,9 @@ class Vector{
     void add(Vector const & vect_in);
     void scale(float const scale);
     void set(float v0, float v1, float v2);
+    float norm(void) const;
+    float norm_squared(void) const;
+    bool is_normed(void) const;
     bool operator==(Vector const & vect_in);
 
     // data members
@@ -54,6 +58,7 @@ class Quaternion{
     void copy(Quaternion const & quat_in);
     void conj(void);
     float norm(void) const;
+    float norm_squared(void) const;
     bool is_normed(float tol=default_tol) const;
     void set (float q0, float q1, float q2, float q3);
     bool operator==(Quaternion const & quat_in);
@@ -87,6 +92,7 @@ void vect_to_quat(Vector const & vect_in, Quaternion & quat_out);
 bool quat_to_vect(Quaternion const & quat_in, Vector & vect_out, float tol=default_tol);
 void quat_to_vect_part(Quaternion const & quat_in, Vector & vect_out);
 float quat_to_scalar_part(Quaternion const & quat_in);
+bool rot_theta_normed_axis_to_rot_quat(float const rot_theta_rad, Vector const & normed_rot_axis, Quaternion & quat_out);
 bool rotate_vect_by_quat_R(Vector const & vect_in, Quaternion const & quat_in, Vector & vect_out);  // using the Rodriguez formula: much faster
 // TODO: put a depreciation warning
 bool rotate_vect_by_quat_Q(Vector const & vect_in, Quaternion const & quat_in, Vector & vect_out);  // using the quaternions formula: slower
@@ -96,3 +102,8 @@ bool rotate_vect_by_quat_Q(Vector const & vect_in, Quaternion const & quat_in, V
 bool vect_quat_library_self_diagnostic(void);
 
 #endif
+
+// TODO: change all function names expecting normed quats and vector to _normed_
+// TODO: extend tests, fix missing tests on boolean flags
+// TODO: make into an own library
+// TODO: inspect API
