@@ -17,11 +17,11 @@ void printAccuracyLevel(byte accuracyNumber){          // accuracy is:
 
 //------------------------------------------------------------------------
 // some parameters
-constexpr unsigned long imu_output_period = 250;
+constexpr unsigned long imu_output_period_millis = 500;
 
 //------------------------------------------------------------------------
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(230400);
   delay(10);
   Serial.println();
   Serial.println("---------- booted ----------");
@@ -40,10 +40,10 @@ void setup() {
   bno080_imu.enableDebugging(Serial);
   delay(50);
   
-  bno080_imu.enableAccelerometer(imu_output_period);
-  bno080_imu.enableMagnetometer(imu_output_period);
-  bno080_imu.enableGyro(imu_output_period);
-  bno080_imu.enableRotationVector(imu_output_period);
+  bno080_imu.enableAccelerometer(imu_output_period_millis);
+  bno080_imu.enableMagnetometer(imu_output_period_millis);
+  bno080_imu.enableGyro(imu_output_period_millis);
+  bno080_imu.enableRotationVector(imu_output_period_millis);
   delay(5000);
 
   Serial.println(F("sensor set up, start measuring"));
@@ -53,6 +53,10 @@ void setup() {
 //------------------------------------------------------------------------
 void loop() {
   if (bno080_imu.dataAvailable() == true){
+    Serial.println();
+    Serial.print(F("millis start: "));
+    Serial.println(millis());
+
     float accel_x = bno080_imu.getAccelX();
     float accel_y = bno080_imu.getAccelY();
     float accel_z = bno080_imu.getAccelZ();
@@ -140,6 +144,9 @@ void loop() {
     rotate_vect_by_quat_R(imu_dir_x_ref_imu, quat_orientation, imu_dir_x_ref_enu);
     Serial.print(F("IMU X-dir in ENU frame: "));
     print(imu_dir_x_ref_enu);
+
+    Serial.print(F("millis end: "));
+    Serial.println(millis());
   }
 }
 
