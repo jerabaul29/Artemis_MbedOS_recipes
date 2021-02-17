@@ -122,17 +122,17 @@ void loop() {
     Serial.print(F("quat norm: "));
     Serial.println(quat_orientation.norm());
 
-    // acceleration in an IMU and NED referential
+    // acceleration in an IMU and ENU referential (the datasheet says it outputs in East North Up rather than North East Down)
     Vector accel_imu_ref{accel_x, accel_y, accel_z};
     Serial.print(F("accel IMU frame of ref norm: "));
     Serial.println(accel_imu_ref.norm());
 
-    Vector accel_NED_ref{};
-    rotate_vect_by_quat_R(accel_imu_ref, quat_orientation, accel_NED_ref);
-    Serial.print(F("accel NED frame of ref norm: "));
-    Serial.println(accel_NED_ref.norm());
-    Serial.print(F("accel NED: "));
-    Serial.println(accel_NED_ref.v2);
+    Vector accel_ENU_ref{};
+    rotate_vect_by_quat_R(accel_imu_ref, quat_orientation, accel_ENU_ref);
+    Serial.print(F("accel ENU frame of ref norm: "));
+    Serial.println(accel_ENU_ref.norm());
+    Serial.print(F("accel ENU: "));
+    print(accel_ENU_ref);
   }
 }
 
