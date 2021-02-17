@@ -3,17 +3,11 @@
 #include "SparkFun_BNO080_Arduino_Library.h"
 #include "vector_and_quaternion.h"
 
-#include "etl.h"
-#include "etl/circular_buffer.h"
-
-#include "assert_tools.h"
-
 BNO080 bno080_imu;
 
-//------------------------------------------------------------------------
-// helper functions
+//--------------------------------------------------------------------------------
+// a few helper functions
 
-//Given a accuracy number, print what it means
 void printAccuracyLevel(byte accuracyNumber){          // accuracy is:
   if (accuracyNumber == 0) Serial.print(F("U"));       // Unreliable
   else if (accuracyNumber == 1) Serial.print(F("L"));  // Low
@@ -23,20 +17,7 @@ void printAccuracyLevel(byte accuracyNumber){          // accuracy is:
 
 //------------------------------------------------------------------------
 // some parameters
-// constexpr unsigned long reading_period_millis = 500;  // works very fine
-constexpr unsigned long reading_period_millis = 5;  // high frequency, but should be fine on all outputs
-constexpr unsigned long printout_frequency = 500;   // we do not want to print too often
-
-//------------------------------------------------------------------------
-// IMU controller
-
-class IMU_Controller{
-  public:
-    void begin(uint8_t deviceAddress = BNO080_DEFAULT_ADDRESS, TwoWire &wirePort = Wire);
-    bool data_available(void);
-    void read_all_data(void);
-    
-};
+constexpr unsigned long imu_output_period = 250;
 
 //------------------------------------------------------------------------
 void setup() {
@@ -51,47 +32,48 @@ void setup() {
   Wire.begin();
   delay(50);
 
+  Wire.setClock(400000);
+  delay(50);
+
   bno080_imu.begin();
   delay(50);
   bno080_imu.enableDebugging(Serial);
   delay(50);
   
-  Wire.setClock(100000);
-  delay(1000);
-
-  bno080_imu.enableAccelerometer(reading_period_millis);
-  bno080_imu.enableMagnetometer(reading_period_millis);
-  bno080_imu.enableGyro(reading_period_millis);
-  bno080_imu.enableRotationVector(reading_period_millis);
+  bno080_imu.enableAccelerometer(imu_output_period);
+  bno080_imu.enableMagnetometer(imu_output_period);
+  bno080_imu.enableGyro(imu_output_period);
+  bno080_imu.enableRotationVector(imu_output_period);
   delay(5000);
 
   Serial.println(F("sensor set up, start measuring"));
+  Serial.println(F("the first measurements may be a bit off, the filter needs time to converge"));
 }
 
 //------------------------------------------------------------------------
 void loop() {
-    if (bno080_imu.dataAvailable() == true){
-      float accel_x = bno080_imu.getAccelX();
-      float accel_y = bno080_imu.getAccelY();
-      float accel_z = bno080_imu.getAccelZ();
-      byte accel_accuracy = bno080_imu.getLinAccelAccuracy();
-  
-      float gyro_x = bno080_imu.getGyroX();
-      float gyro_y = bno080_imu.getGyroY();
-      float gyro_z = bno080_imu.getGyroZ();
-      byte gyro_accuracy = bno080_imu.getGyroAccuracy();
-  
-      float mag_x = bno080_imu.getMagX();
-      float mag_y = bno080_imu.getMagY();
-      float mag_z = bno080_imu.getMagZ();
-      byte mag_accuracy = bno080_imu.getMagAccuracy();
-  
-      float quat_i = bno080_imu.getQuatI();
-      float quat_j = bno080_imu.getQuatJ();
-      float quat_k = bno080_imu.getQuatK();
-      float quat_real = bno080_imu.getQuatReal();
-      byte quat_accuracy = bno080_imu.getQuatAccuracy();
-      float quat_radian_accuracry = bno080_imu.getQuatRadianAccuracy();
+  if (bno080_imu.dataAvailable() == true){
+    float accel_x = bno080_imu.getAccelX();
+    float accel_y = bno080_imu.getAccelY();
+    float accel_z = bno080_imu.getAccelZ();
+    byte accel_accuracy = bno080_imu.getLinAccelAccuracy();
+
+    float gyro_x = bno080_imu.getGyroX();
+    float gyro_y = bno080_imu.getGyroY();
+    float gyro_z = bno080_imu.getGyroZ();
+    byte gyro_accuracy = bno080_imu.getGyroAccuracy();
+
+    float mag_x = bno080_imu.getMagX();
+    float mag_y = bno080_imu.getMagY();
+    float mag_z = bno080_imu.getMagZ();
+    byte mag_accuracy = bno080_imu.getMagAccuracy();
+
+    float quat_i = bno080_imu.getQuatI();
+    float quat_j = bno080_imu.getQuatJ();
+    float quat_k = bno080_imu.getQuatK();
+    float quat_real = bno080_imu.getQuatReal();
+    byte quat_accuracy = bno080_imu.getQuatAccuracy();
+    float quat_radian_accuracry = bno080_imu.getQuatRadianAccuracy();
 
     Serial.print(F(" -accel: "));
     Serial.print(accel_x, 4);
@@ -132,8 +114,26 @@ void loop() {
     printAccuracyLevel(quat_accuracy);
     Serial.print(F(", "));
     Serial.print(quat_radian_accuracry, 4);
-
     Serial.println();
-  }
 
+    // look at quaternion data
+    Quaternion quat_orientation {quat_real, quat_i, quat_j, quat_k};
+    print(quat_orientation);
+    Serial.print(F("quat norm: "));
+    Serial.println(quat_orientation.norm());
+
+    // acceleration in an IMU and NED referential
+    Vector accel_imu_ref{accel_x, accel_y, accel_z};
+    Serial.print(F("accel IMU frame of ref norm: "));
+    Serial.println(accel_imu_ref.norm());
+
+    Vector accel_NED_ref{};
+    rotate_vect_by_quat_R(accel_imu_ref, quat_orientation, accel_NED_ref);
+    Serial.print(F("accel NED frame of ref norm: "));
+    Serial.println(accel_NED_ref.norm());
+    Serial.print(F("accel NED: "));
+    Serial.println(accel_NED_ref.v2);
+  }
 }
+
+// TODO: quat norm is sometimes off!

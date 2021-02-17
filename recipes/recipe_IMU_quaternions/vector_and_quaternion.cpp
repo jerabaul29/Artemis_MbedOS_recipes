@@ -621,7 +621,7 @@ bool vect_quat_library_self_diagnostic(void){
 
   //--------------------------------------------------------------------------------
 
-  Serial.println(F("finished, vect and quat operations a success"));
+  Serial.println(F("diagnostic finished, vect and quat operations a success"));
   delay(500);
 
   return true;
