@@ -27,6 +27,7 @@ class Vector{
     // constructor
     Vector(float v0, float v1, float v2);
     Vector(Vector const & vect_in);
+    Vector(void);
 
     void copy(Vector const & vect_in);
     void add(Vector const & vect_in);
@@ -48,6 +49,7 @@ class Quaternion{
     // constructor
     Quaternion(float q0, float q1, float q2, float q3);
     Quaternion(Quaternion const & quat_in);
+    Quaternion(void);
 
     void copy(Quaternion const & quat_in);
     void conj(void);
@@ -86,7 +88,6 @@ bool quat_to_vect(Quaternion const & quat_in, Vector & vect_out, float tol=defau
 void quat_to_vect_part(Quaternion const & quat_in, Vector & vect_out);
 float quat_to_scalar_part(Quaternion const & quat_in);
 bool rotate_vect_by_quat_R(Vector const & vect_in, Quaternion const & quat_in, Vector & vect_out);  // using the Rodriguez formula: much faster
-
 // TODO: put a depreciation warning
 bool rotate_vect_by_quat_Q(Vector const & vect_in, Quaternion const & quat_in, Vector & vect_out);  // using the quaternions formula: slower
 

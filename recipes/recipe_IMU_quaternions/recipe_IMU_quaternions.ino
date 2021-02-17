@@ -56,8 +56,8 @@ void setup() {
   bno080_imu.enableDebugging(Serial);
   delay(50);
   
-  Wire.setClock(400000); //Increase I2C data rate to 400kHz
-  delay(50);
+  Wire.setClock(100000);
+  delay(1000);
 
   bno080_imu.enableAccelerometer(reading_period_millis);
   bno080_imu.enableMagnetometer(reading_period_millis);
@@ -65,7 +65,7 @@ void setup() {
   bno080_imu.enableRotationVector(reading_period_millis);
   delay(5000);
 
-  Serial.println(F("sensor set up, start measurin"));
+  Serial.println(F("sensor set up, start measuring"));
 }
 
 //------------------------------------------------------------------------

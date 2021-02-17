@@ -14,6 +14,10 @@ Quaternion::Quaternion(Quaternion const & quat_in):
   q0{quat_in.q0}, q1{quat_in.q1}, q2{quat_in.q2}, q3{quat_in.q3}
   {}
 
+Quaternion::Quaternion(void):
+  q0{0}, q1{0}, q2{0}, q3{0}
+  {}
+
 void Quaternion::copy(Quaternion const & quat_in){
   q0 = quat_in.q0;
   q1 = quat_in.q1;
@@ -60,6 +64,10 @@ Vector::Vector(float v0, float v1, float v2):
 
 Vector::Vector(Vector const & vect_in):
   v0{vect_in.v0}, v1{vect_in.v1}, v2{vect_in.v2}
+  {}
+
+Vector::Vector(void):
+  v0{0}, v1{0}, v2{0}
   {}
 
 void Vector::copy(Vector const & vect_in){
@@ -274,7 +282,12 @@ bool vect_quat_library_self_diagnostic(void){
 
   // test vectors --------------------
   Vector v1 {1, 2, 3};
-  Vector v2 {0, 0, 0};
+  Vector v2 {2, 4, 6};
+  Vector v3 {2, 4, 6};
+  Vector v4{};
+
+  uassert(v2 == v3, "vect constr or == fails");
+  uassert(v4 == Vector{0, 0, 0}, "vect constr or == fails");
 
   Serial.println(F("an example of vector print"));
   print(v1);
@@ -282,7 +295,6 @@ bool vect_quat_library_self_diagnostic(void){
   v2.copy(v1);
   uassert(v2 == v1, "vect copy fails");
 
-  Vector v3 {2, 4, 6};
   v2.add(v1);
   uassert(v2 == v3, "vect add fails");
 
@@ -295,14 +307,17 @@ bool vect_quat_library_self_diagnostic(void){
   // test quaternions --------------------
   Quaternion q1 {0, 0, 0, 0};
   Quaternion q2 {1, 2, 3, 4};
+  Quaternion q3 {1, -2, -3, -4};
+  Quaternion q4 {0.0, 1.0, 0.0, 0.0};
 
   Serial.println(F("an example of print quaternion"));
   print(q2);
 
+  uassert(q1 == Quaternion{}, "quat constr or == fails");
+
   q1.copy(q2);
   uassert(q1 == q2, "quat copy fails");
 
-  Quaternion q3 {1, -2, -3, -4};
   q1.conj();
   uassert(q1 == q3, "quat conj fails");
 
@@ -310,7 +325,6 @@ bool vect_quat_library_self_diagnostic(void){
 
   uassert(!q2.is_normed(), "quat is_normed fails");
 
-  Quaternion q4 {0.0, 1.0, 0.0, 0.0};
   uassert(q4.is_normed(), "quat is_normed fails");
 
   q4.set(0.5, 0.5, 0.5, 0.5);
@@ -324,10 +338,93 @@ bool vect_quat_library_self_diagnostic(void){
   v2.set(2.0, 3.0, 4.0);
   uassert(is_approx(vect_dot(v1, v2), 20), "vect_dot fails");
 
-  // TODO: continue from vect_cross
+  v1.set(1, 0, 0);
+  v2.set(1, 0, 0);
+  v3.set(2, 3, 4);
+  vect_cross(v1, v2, v3);
+  uassert(v3 == Vector{}, "cross product 1 fails");
+  
+  v1.set(1, 0, 0);
+  v2.set(0, 1, 0);
+  vect_cross(v1, v2, v3);
+  uassert(v3 == Vector{0, 0, 1}, "cross product 2 fails");
+
+  v1.set(0, 1, 0);
+  v2.set(1, 0, 0);
+  vect_cross(v1, v2, v3);
+  uassert(v3 == Vector{0, 0, -1}, "cross product 3 fails");
+
+  v1.set(0, 1, 0);
+  v2.set(0, 0, 1);
+  vect_cross(v1, v2, v3);
+  uassert(v3 == Vector{1, 0, 0}, "cross product 4 fails");
+
+  v1.set(1, 0, 0);
+  v2.set(0, 0, 1);
+  vect_cross(v1, v2, v3);
+  uassert(v3 == Vector{0, -1, 0}, "cross product 5 fails");
+
+  v1.set(1, 0.1, 0.5);
+  v2.set(2., 0.2, 1.5);
+  vect_cross(v1, v2, v3);
+  uassert(v3 == Vector{0.1*1.5-0.2*0.5, 0.5*2.0-1.0*1.5, 1*0.2-2*0.1}, "cross product 6 fails");
+
+  v1.set(1, 2, 3);
+  v2.set(4, 5, 6);
+  vect_add(v1, v2, v3);
+  uassert(v3 == Vector{5, 7, 9}, "vect add fails");
+
+  vect_scale(v1, 0.5, v2);
+  uassert(v2 == Vector{0.5, 1, 1.5}, "vect scale fails");
 
   // test quaternions and vectors operations --------------------
+  bool return_flag;
 
+  v1.set(1, 2, 3);
+  q1.set(0, 0, 0, 0);
+  vect_to_quat(v1, q1);
+  uassert(q1 == Quaternion{0, 1, 2, 3}, "vect_to_quat fails");
+
+  q1.set(0, 3, 4, 5);
+  return_flag = quat_to_vect(q1, v1);
+  uassert(((return_flag) && (v1 == Vector{3, 4, 5})), "quat_to_vect fails");
+
+  q1.set(1, 4, 5, 6);
+  return_flag = quat_to_vect(q1, v1);
+  uassert(((!return_flag) && (v1 == Vector{4, 5, 6})), "quat_to_vect fails");
+
+  q1.set(2.5, 1, 2, 3);
+  quat_to_vect_part(q1, v1);
+  uassert(v1 == Vector(1, 2, 3), "quat_to_vect_part fails");
+
+  uassert(2.5 == quat_to_scalar_part(q1), "quat_to_scalar_part fails");
+
+  bool return_flag_rotate_R {false};
+  bool return_flag_rotate_Q {false};
+
+  v1.set(1, 0, 0);
+  q1.set(1.5, 0, 0, 0);
+  return_flag_rotate_R = rotate_vect_by_quat_R(v1, q1, v2);
+  return_flag_rotate_Q = rotate_vect_by_quat_R(v1, q1, v3);
+  print(v2);
+  Serial.println(return_flag_rotate_R);
+  print(v3);
+  Serial.println(return_flag_rotate_Q);
+  uassert(((!return_flag_rotate_R) && (v2 == Vector{2.25, 0, 0})), "rotate_vect_by_quat_R 1 fails");
+  uassert(((!return_flag_rotate_Q) && (v3 == Vector{2.25, 0, 0})), "rotate_vect_by_quat_Q 1 fails");
+
+  v1.set(1, 0, 0);
+  q1.set(0, 0, 0, 0);
+  return_flag_rotate_R = rotate_vect_by_quat_R(v1, q1, v2);
+  return_flag_rotate_Q = rotate_vect_by_quat_R(v1, q1, v3);
+  print(v2);
+  Serial.println(return_flag_rotate_R);
+  print(v3);
+  Serial.println(return_flag_rotate_Q);
+  uassert(((return_flag_rotate_R) && (v2 == Vector{2.25, 0, 0})), "rotate_vect_by_quat_R 1 fails");
+  uassert(((return_flag_rotate_Q) && (v3 == Vector{2.25, 0, 0})), "rotate_vect_by_quat_Q 1 fails");
+
+  //--------------------------------------------------------------------------------
   Serial.println(F("finished, vect and quat operations a success"));
   delay(500);
 
