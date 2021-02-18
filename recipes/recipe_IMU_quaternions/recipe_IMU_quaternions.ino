@@ -177,19 +177,17 @@ void loop() {
 
     if (abs(quat_orientation.norm() - 1.0f) > 1.0e-4){
       Serial.println(F("**********************************************************************"));
-      Serial.println(F("************************ ERROR: NON INIT QUAT ************************"));
+      Serial.println(F("************************ ERROR: NON UNIT QUAT ************************"));
       Serial.println(F("**********************************************************************"));
     }
 
     // acceleration in an IMU and ENU referential (the datasheet says it outputs in East North Up rather than North East Down)
     Vector accel_imu_ref{accel_x, accel_y, accel_z};
-    Serial.print(F("accel IMU frame of ref norm: "));
-    Serial.println(accel_imu_ref.norm());
+    Serial.print(F("accel norm IMU frame of ref: ")); Serial.print(accel_imu_ref.norm());
 
     Vector accel_ENU_ref{};
     rotate_vect_by_quat_R(accel_imu_ref, quat_orientation, accel_ENU_ref);
-    Serial.print(F("accel ENU frame of ref norm: "));
-    Serial.println(accel_ENU_ref.norm());
+    Serial.print(F(" | ENU frame of ref: ")); Serial.println(accel_ENU_ref.norm());
     Serial.print(F("accel ENU: "));
     print(accel_ENU_ref);
 
@@ -200,9 +198,17 @@ void loop() {
     Serial.print(F("IMU X-dir in ENU frame: "));
     print(imu_dir_x_ref_enu);
 
+    // TODO: quality checks
+    if (abs(accel_ENU_ref.norm() - 9.81) > 10.0){
+      Serial.println(F("**************************************************"));
+      Serial.println(F("***** WARNING: VERY HIGH ACCELS, IS IT TRUE? *****"));
+      Serial.println(F("**************************************************"));
+    }
+
     unsigned long millis_end = millis();
-    Serial.print(F("millis end: ")); Serial.print(millis_end); Serial.print(F(" | analysis + print duration: ")); Serial.println(millis_end-millis_start);
+    Serial.print(F("millis end: ")); Serial.print(millis_end); Serial.print(F(" | analysis + print duration: ")); Serial.print(millis_end-millis_start); Serial.println(F("ms"));
     Serial.println();
+    
   }
 }
 
