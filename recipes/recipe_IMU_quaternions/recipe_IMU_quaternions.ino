@@ -77,7 +77,7 @@ void loop() {
   uint16_t reading_status = bno080_imu.getReadings();
   
   if (reading_status != 0){
-    Serial.print(F("received data at ms: "));
+    Serial.print(F("received data at ms: ")); Serial.print(millis()); Serial.print(F(" | type: "));
 
     if (reading_status == SENSOR_REPORTID_ACCELEROMETER){
       accel_x = bno080_imu.getAccelX();
@@ -123,9 +123,10 @@ void loop() {
 
   if (millis() - millis_last_analysis >= imu_output_period_millis){
     millis_last_analysis += imu_output_period_millis;
+    unsigned long millis_start = millis();
 
     Serial.println();
-    Serial.print(F("millis start analysis: ")); Serial.println(millis());
+    Serial.print(F("millis start analysis: ")); Serial.println(millis_start);
 
     Serial.print(F("accel: "));
     Serial.print(accel_x, 4);
@@ -199,7 +200,8 @@ void loop() {
     Serial.print(F("IMU X-dir in ENU frame: "));
     print(imu_dir_x_ref_enu);
 
-    Serial.print(F("millis end: ")); Serial.println(millis());
+    unsigned long millis_end = millis();
+    Serial.print(F("millis end: ")); Serial.print(millis_end); Serial.print(F(" | analysis + print duration: ")); Serial.println(millis_end-millis_start);
     Serial.println();
   }
 }
