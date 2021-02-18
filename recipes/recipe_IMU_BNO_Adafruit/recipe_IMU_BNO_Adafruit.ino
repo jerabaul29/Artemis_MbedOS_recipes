@@ -62,303 +62,242 @@ bno08x.begin_I2C(0x4B, &Wire, 0)
 */
 
 #include "Arduino.h"
+#include "WDT.h"
 
 #include <Adafruit_BNO08x.h>
 
 Adafruit_BNO08x bno08x{};
 sh2_SensorValue_t sensorValue;
 
-void setReports(void) {
-  Serial.println("Setting desired reports");
-  if (!bno08x.enableReport(SH2_ACCELEROMETER)) {
-    Serial.println("Could not enable accelerometer");
+APM3_WDT wdt;
+
+constexpr unsigned long sample_period_microseconds {500000UL};
+bool constexpr verbose_report {false};
+
+constexpr unsigned long baudrate {115200};
+
+volatile bool dummy_var_for_wait {false};
+volatile int remaining_watchdog_tries {10};
+
+// Interrupt handler for the watchdog
+extern "C" void am_watchdog_isr(void)
+{
+  // Clear the watchdog interrupt
+  wdt.clear();
+  
+  if (remaining_watchdog_tries > 0){
+    wdt.restart();
+    remaining_watchdog_tries -= 1;
+    
+      SPI.end();
+      power_adc_disable();
+      Serial.end();
+      Wire.end();
+      //Force the peripherals off
+      am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_IOM0);
+      am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_IOM1);
+      am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_IOM2);
+      am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_IOM3);
+      am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_IOM4);
+      am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_IOM5);
+      am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_ADC);
+      am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_UART0);
+      am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_UART1);
+
+      for (int i=0; i<1000000; i++){
+        dummy_var_for_wait = !dummy_var_for_wait;
+      }
+      wdt.restart();
+
+      am_hal_pwrctrl_periph_enable(AM_HAL_PWRCTRL_PERIPH_IOM0);
+      am_hal_pwrctrl_periph_enable(AM_HAL_PWRCTRL_PERIPH_IOM1);
+      am_hal_pwrctrl_periph_enable(AM_HAL_PWRCTRL_PERIPH_IOM2);
+      am_hal_pwrctrl_periph_enable(AM_HAL_PWRCTRL_PERIPH_IOM3);
+      am_hal_pwrctrl_periph_enable(AM_HAL_PWRCTRL_PERIPH_IOM4);
+      am_hal_pwrctrl_periph_enable(AM_HAL_PWRCTRL_PERIPH_IOM5);
+      am_hal_pwrctrl_periph_enable(AM_HAL_PWRCTRL_PERIPH_ADC);
+      am_hal_pwrctrl_periph_enable(AM_HAL_PWRCTRL_PERIPH_UART0);
+      am_hal_pwrctrl_periph_enable(AM_HAL_PWRCTRL_PERIPH_UART1);
+
+      for (int i=0; i<1000000; i++){
+        dummy_var_for_wait = !dummy_var_for_wait;
+      }
+      wdt.restart();
+
+      Wire.begin();
+      SPI.begin();
+      Serial.begin(baudrate);
+
+      for (int i=0; i<1000000; i++){
+        dummy_var_for_wait = !dummy_var_for_wait;
+      }
+      wdt.restart();
+
+      Serial.print(F("retry I2C "));
+    
   }
-  if (!bno08x.enableReport(SH2_GYROSCOPE_CALIBRATED)) {
-    Serial.println("Could not enable gyroscope");
-  }
-  if (!bno08x.enableReport(SH2_MAGNETIC_FIELD_CALIBRATED)) {
-    Serial.println("Could not enable magnetic field calibrated");
-  }
-  if (!bno08x.enableReport(SH2_LINEAR_ACCELERATION)) {
-    Serial.println("Could not enable linear acceleration");
-  }
-  if (!bno08x.enableReport(SH2_ROTATION_VECTOR)) {
-    Serial.println("Could not enable rotation vector");
-  }
-  if (!bno08x.enableReport(SH2_GEOMAGNETIC_ROTATION_VECTOR)) {
-    Serial.println("Could not enable geomagnetic rotation vector");
-  }
-  if (!bno08x.enableReport(SH2_GAME_ROTATION_VECTOR)) {
-    Serial.println("Could not enable game rotation vector");
-  }
-  if (!bno08x.enableReport(SH2_STEP_COUNTER)) {
-    Serial.println("Could not enable step counter");
-  }
-  if (!bno08x.enableReport(SH2_STABILITY_CLASSIFIER)) {
-    Serial.println("Could not enable stability classifier");
-  }
-  if (!bno08x.enableReport(SH2_RAW_ACCELEROMETER)) {
-    Serial.println("Could not enable raw accelerometer");
-  }
-  if (!bno08x.enableReport(SH2_RAW_GYROSCOPE)) {
-    Serial.println("Could not enable raw gyroscope");
-  }
-  if (!bno08x.enableReport(SH2_RAW_MAGNETOMETER)) {
-    Serial.println("Could not enable raw magnetometer");
-  }
-  if (!bno08x.enableReport(SH2_SHAKE_DETECTOR)) {
-    Serial.println("Could not enable shake detector");
-  }
-  if (!bno08x.enableReport(SH2_PERSONAL_ACTIVITY_CLASSIFIER)) {
-    Serial.println("Could not enable personal activity classifier");
+  else{
+    // reset
+    while (true){
+      ;
+    }
   }
 }
 
-void printActivity(uint8_t activity_id) {
-  switch (activity_id) {
-  case PAC_UNKNOWN:
-    Serial.print("Unknown");
-    break;
-  case PAC_IN_VEHICLE:
-    Serial.print("In Vehicle");
-    break;
-  case PAC_ON_BICYCLE:
-    Serial.print("On Bicycle");
-    break;
-  case PAC_ON_FOOT:
-    Serial.print("On Foot");
-    break;
-  case PAC_STILL:
-    Serial.print("Still");
-    break;
-  case PAC_TILTING:
-    Serial.print("Tilting");
-    break;
-  case PAC_WALKING:
-    Serial.print("Walking");
-    break;
-  case PAC_RUNNING:
-    Serial.print("Running");
-    break;
-  case PAC_ON_STAIRS:
-    Serial.print("On Stairs");
-    break;
-  default:
-    Serial.print("NOT LISTED");
+void resetArtemis(void)
+{
+  Wire.end(); //Power down I2C
+
+  SPI.end(); //Power down SPI
+
+  power_adc_disable(); //Power down ADC. It it started by default before setup().
+
+  Serial.end(); //Power down UART
+
+  //Force the peripherals off
+  am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_IOM0);
+  am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_IOM1);
+  am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_IOM2);
+  am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_IOM3);
+  am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_IOM4);
+  am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_IOM5);
+  am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_ADC);
+  am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_UART0);
+  am_hal_pwrctrl_periph_disable(AM_HAL_PWRCTRL_PERIPH_UART1);
+
+  while (1) // That's all folks! Artemis will watchdog reset in 1.25 seconds
+    ;
+}
+
+void setReports(void) {
+  if (!bno08x.enableReport(SH2_ROTATION_VECTOR, sample_period_microseconds)) {
+    Serial.println("Could not enable rotation vector");
   }
-  Serial.print(" (");
-  Serial.print(activity_id);
-  Serial.print(")");
+  if (!bno08x.enableReport(SH2_ACCELEROMETER, sample_period_microseconds)) {
+    Serial.println("Could not enable rotation vector");
+  }
 }
 
 void setup(void) {
-  Serial.begin(115200);
+  wdt.start();
+  
+  Serial.begin(baudrate);
   while (!Serial){
     delay(10);
   }
 
+  Serial.println();
   Serial.println("------ booted ------");
+  Serial.println();
+
+  // start wire
+  Wire.end();
+  delay(50);
+  Wire.begin();
+  delay(50);
+
+  // we may hang at I2C begin; if this is the case, try to re-start I2C with the watchdog
+  // TODO: jump back here with the watchdog?
+  remaining_watchdog_tries = 10;
 
   // initialize
-  while (!bno08x.begin_I2C(0x4B, &Wire, 0)) {
-    Serial.println("Failed to find BNO08x chip");
-    delay(500);
+  for (int i=0; i<60;i++){
+    wdt.restart();
+    if (bno08x.begin_I2C(0x4B, &Wire, 0)){
+      Serial.println(F("found the Artemis!"));
+      break;
+    }
+    else{
+      Serial.print("Failed to find BNO08x chip "); Serial.println(i+1);
+      if (i == 19){
+        Serial.println(F("reset Artemis"));
+        resetArtemis();
+      }
+      Wire.end();
+      delay(50);
+      Wire.begin();
+      delay(50);
+      
+      delay(500);
+    }
   }
+
+  // now, no more reason to allow some re-tries with the watchdog!
+  remaining_watchdog_tries = 0;
 
   Wire.setClock(400000);
   delay(50);
-
-  for (int n = 0; n < bno08x.prodIds.numEntries; n++) {
-    Serial.print("Part ");
-    Serial.print(bno08x.prodIds.entry[n].swPartNumber);
-    Serial.print(": Version :");
-    Serial.print(bno08x.prodIds.entry[n].swVersionMajor);
-    Serial.print(".");
-    Serial.print(bno08x.prodIds.entry[n].swVersionMinor);
-    Serial.print(".");
-    Serial.print(bno08x.prodIds.entry[n].swVersionPatch);
-    Serial.print(" Build ");
-    Serial.println(bno08x.prodIds.entry[n].swBuildNumber);
-  }
-
+  
   setReports();
 
   Serial.println("----- Reading events -----");
   delay(100);
 }
 
+float accel_norm;
+float quat_norm;
+
 void loop() {
-  delay(10);
+  wdt.restart();
 
   if (bno08x.wasReset()) {
-    Serial.print("sensor was reset ");
+    Serial.println("sensor was reset ");
     setReports();
   }
 
-  if (!bno08x.getSensorEvent(&sensorValue)) {
-    return;
-  }
+  if (bno08x.getSensorEvent(&sensorValue)) {
 
-  switch (sensorValue.sensorId) {
-
-  case SH2_ACCELEROMETER:
-    Serial.print("Accelerometer - x: ");
-    Serial.print(sensorValue.un.accelerometer.x);
-    Serial.print(" y: ");
-    Serial.print(sensorValue.un.accelerometer.y);
-    Serial.print(" z: ");
-    Serial.println(sensorValue.un.accelerometer.z);
-    break;
-  case SH2_GYROSCOPE_CALIBRATED:
-    Serial.print("Gyro - x: ");
-    Serial.print(sensorValue.un.gyroscope.x);
-    Serial.print(" y: ");
-    Serial.print(sensorValue.un.gyroscope.y);
-    Serial.print(" z: ");
-    Serial.println(sensorValue.un.gyroscope.z);
-    break;
-  case SH2_MAGNETIC_FIELD_CALIBRATED:
-    Serial.print("Magnetic Field - x: ");
-    Serial.print(sensorValue.un.magneticField.x);
-    Serial.print(" y: ");
-    Serial.print(sensorValue.un.magneticField.y);
-    Serial.print(" z: ");
-    Serial.println(sensorValue.un.magneticField.z);
-    break;
-  case SH2_LINEAR_ACCELERATION:
-    Serial.print("Linear Acceration - x: ");
-    Serial.print(sensorValue.un.linearAcceleration.x);
-    Serial.print(" y: ");
-    Serial.print(sensorValue.un.linearAcceleration.y);
-    Serial.print(" z: ");
-    Serial.println(sensorValue.un.linearAcceleration.z);
-    break;
-  case SH2_ROTATION_VECTOR:
-    Serial.print("Rotation Vector - r: ");
-    Serial.print(sensorValue.un.rotationVector.real);
-    Serial.print(" i: ");
-    Serial.print(sensorValue.un.rotationVector.i);
-    Serial.print(" j: ");
-    Serial.print(sensorValue.un.rotationVector.j);
-    Serial.print(" k: ");
-    Serial.println(sensorValue.un.rotationVector.k);
-    break;
-  case SH2_GEOMAGNETIC_ROTATION_VECTOR:
-    Serial.print("Geo-Magnetic Rotation Vector - r: ");
-    Serial.print(sensorValue.un.geoMagRotationVector.real);
-    Serial.print(" i: ");
-    Serial.print(sensorValue.un.geoMagRotationVector.i);
-    Serial.print(" j: ");
-    Serial.print(sensorValue.un.geoMagRotationVector.j);
-    Serial.print(" k: ");
-    Serial.println(sensorValue.un.geoMagRotationVector.k);
-    break;
-
-  case SH2_GAME_ROTATION_VECTOR:
-    Serial.print("Game Rotation Vector - r: ");
-    Serial.print(sensorValue.un.gameRotationVector.real);
-    Serial.print(" i: ");
-    Serial.print(sensorValue.un.gameRotationVector.i);
-    Serial.print(" j: ");
-    Serial.print(sensorValue.un.gameRotationVector.j);
-    Serial.print(" k: ");
-    Serial.println(sensorValue.un.gameRotationVector.k);
-    break;
-
-  case SH2_STEP_COUNTER:
-    Serial.print("Step Counter - steps: ");
-    Serial.print(sensorValue.un.stepCounter.steps);
-    Serial.print(" latency: ");
-    Serial.println(sensorValue.un.stepCounter.latency);
-    break;
-
-  case SH2_STABILITY_CLASSIFIER: {
-    Serial.print("Stability Classification: ");
-    sh2_StabilityClassifier_t stability = sensorValue.un.stabilityClassifier;
-    switch (stability.classification) {
-    case STABILITY_CLASSIFIER_UNKNOWN:
-      Serial.println("Unknown");
+    switch (sensorValue.sensorId) {
+  
+    case SH2_ACCELEROMETER:
+      if (verbose_report){
+        Serial.print("Accelerometer - x: ");
+        Serial.print(sensorValue.un.accelerometer.x);
+        Serial.print(" y: ");
+        Serial.print(sensorValue.un.accelerometer.y);
+        Serial.print(" z: ");
+        Serial.println(sensorValue.un.accelerometer.z);
+      }
+  
+       accel_norm = sqrt(
+          sensorValue.un.accelerometer.x * sensorValue.un.accelerometer.x +
+          sensorValue.un.accelerometer.y * sensorValue.un.accelerometer.y +
+          sensorValue.un.accelerometer.z * sensorValue.un.accelerometer.z
+       );
+  
+      if (abs(accel_norm - 9.81) > 10.0){
+        Serial.println(F("**************************************************"));
+        Serial.println(F("***** WARNING: VERY HIGH ACCELS, IS IT TRUE? *****"));
+        Serial.println(F("**************************************************"));
+        Serial.print(F("accel norm: ")); Serial.println(accel_norm);
+      }
+      
       break;
-    case STABILITY_CLASSIFIER_ON_TABLE:
-      Serial.println("On Table");
-      break;
-    case STABILITY_CLASSIFIER_STATIONARY:
-      Serial.println("Stationary");
-      break;
-    case STABILITY_CLASSIFIER_STABLE:
-      Serial.println("Stable");
-      break;
-    case STABILITY_CLASSIFIER_MOTION:
-      Serial.println("In Motion");
+  
+    case SH2_ROTATION_VECTOR:
+      if (verbose_report){
+        Serial.print("Rotation Vector - r: ");
+        Serial.print(sensorValue.un.rotationVector.real);
+        Serial.print(" i: ");
+        Serial.print(sensorValue.un.rotationVector.i);
+        Serial.print(" j: ");
+        Serial.print(sensorValue.un.rotationVector.j);
+        Serial.print(" k: ");
+        Serial.println(sensorValue.un.rotationVector.k);
+      }
+  
+      quat_norm = sensorValue.un.rotationVector.real * sensorValue.un.rotationVector.real
+                      + sensorValue.un.rotationVector.i * sensorValue.un.rotationVector.i
+                      + sensorValue.un.rotationVector.j * sensorValue.un.rotationVector.j
+                      + sensorValue.un.rotationVector.k * sensorValue.un.rotationVector.k;
+                      
+      if (abs(quat_norm - 1.0f) > 1.0e-4){
+        Serial.println(F("**********************************************************************"));
+        Serial.println(F("************************ ERROR: NON UNIT QUAT ************************"));
+        Serial.println(F("**********************************************************************"));
+        Serial.print(F("quat norm: ")); Serial.println(quat_norm);
+      }
       break;
     }
-    break;
-  }
-
-  case SH2_RAW_ACCELEROMETER:
-    Serial.print("Raw Accelerometer - x: ");
-    Serial.print(sensorValue.un.rawAccelerometer.x);
-    Serial.print(" y: ");
-    Serial.print(sensorValue.un.rawAccelerometer.y);
-    Serial.print(" z: ");
-    Serial.println(sensorValue.un.rawAccelerometer.z);
-    break;
-  case SH2_RAW_GYROSCOPE:
-    Serial.print("Raw Gyro - x: ");
-    Serial.print(sensorValue.un.rawGyroscope.x);
-    Serial.print(" y: ");
-    Serial.print(sensorValue.un.rawGyroscope.y);
-    Serial.print(" z: ");
-    Serial.println(sensorValue.un.rawGyroscope.z);
-    break;
-  case SH2_RAW_MAGNETOMETER:
-    Serial.print("Raw Magnetic Field - x: ");
-    Serial.print(sensorValue.un.rawMagnetometer.x);
-    Serial.print(" y: ");
-    Serial.print(sensorValue.un.rawMagnetometer.y);
-    Serial.print(" z: ");
-    Serial.println(sensorValue.un.rawMagnetometer.z);
-    break;
-
-  case SH2_SHAKE_DETECTOR: {
-    Serial.print("Shake Detector - shake detected on axis: ");
-    sh2_ShakeDetector_t detection = sensorValue.un.shakeDetector;
-    switch (detection.shake) {
-    case SHAKE_X:
-      Serial.println("X");
-      break;
-    case SHAKE_Y:
-      Serial.println("Y");
-      break;
-    case SHAKE_Z:
-      Serial.println("Z");
-      break;
-    default:
-      Serial.println("None");
-      break;
-    }
-  }
-
-  case SH2_PERSONAL_ACTIVITY_CLASSIFIER: {
-
-    sh2_PersonalActivityClassifier_t activity =
-        sensorValue.un.personalActivityClassifier;
-    uint8_t page_num = activity.page;
-    Serial.print("Activity classification - Most likely: ");
-    printActivity(activity.mostLikelyState);
-    Serial.println("");
-
-    Serial.println("Confidences:");
-    // if PAC_OPTION_COUNT is ever > 10, we'll need to
-    // care about page
-    for (uint8_t i = 0; i < PAC_OPTION_COUNT; i++) {
-      Serial.print("\t");
-      printActivity(i);
-      Serial.print(": ");
-      Serial.println(activity.confidence[i]);
-    }
-  }
   }
 }
-
-
