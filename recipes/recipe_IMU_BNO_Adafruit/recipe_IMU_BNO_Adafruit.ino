@@ -71,7 +71,7 @@ sh2_SensorValue_t sensorValue;
 
 APM3_WDT wdt;
 
-constexpr unsigned long sample_period_microseconds {500000UL};
+constexpr unsigned long sample_period_microseconds {5000UL};
 bool constexpr verbose_report {false};
 
 constexpr unsigned long baudrate {115200};
