@@ -17,7 +17,8 @@ void printAccuracyLevel(byte accuracyNumber){          // accuracy is:
 
 //------------------------------------------------------------------------
 // some parameters
-constexpr unsigned long imu_output_period_millis = 500;
+constexpr unsigned long imu_output_period_millis = 500UL;
+unsigned long millis_last_analysis {0};
 
 //------------------------------------------------------------------------
 void setup() {
@@ -44,42 +45,89 @@ void setup() {
   bno080_imu.enableMagnetometer(imu_output_period_millis);
   bno080_imu.enableGyro(imu_output_period_millis);
   bno080_imu.enableRotationVector(imu_output_period_millis);
-  delay(5000);
 
   Serial.println(F("sensor set up, start measuring"));
   Serial.println(F("the first measurements may be a bit off, the filter needs time to converge"));
+
+  delay(5000);
+  
+  millis_last_analysis = millis();
+
+  Serial.println(F("wait for the first BNO output"));
+  Serial.println();
+
+  while (true){
+    if (bno080_imu.getReadings() != 0){
+      break;
+    }
+  }
 }
+
+float accel_x, accel_y, accel_z;
+byte accel_accuracy;
+float gyro_x, gyro_y, gyro_z;
+byte gyro_accuracy;
+float mag_x, mag_y, mag_z;
+byte mag_accuracy;
+float quat_i, quat_j, quat_k, quat_real, quat_radian_accuracy;
+byte quat_accuracy;
 
 //------------------------------------------------------------------------
 void loop() {
-  if (bno080_imu.dataAvailable() == true){
+  uint16_t reading_status = bno080_imu.getReadings();
+  
+  if (reading_status != 0){
+    Serial.print(F("received data at ms: "));
+
+    if (reading_status == SENSOR_REPORTID_ACCELEROMETER){
+      accel_x = bno080_imu.getAccelX();
+      accel_y = bno080_imu.getAccelY();
+      accel_z = bno080_imu.getAccelZ();
+      accel_accuracy = bno080_imu.getLinAccelAccuracy();
+      Serial.println(F("accel"));
+    }
+
+    if(reading_status == SENSOR_REPORTID_GYROSCOPE){
+      gyro_x = bno080_imu.getGyroX();
+      gyro_y = bno080_imu.getGyroY();
+      gyro_z = bno080_imu.getGyroZ();
+      gyro_accuracy = bno080_imu.getGyroAccuracy();
+      Serial.println(F("gyro"));
+    }
+
+    if(reading_status == SENSOR_REPORTID_MAGNETIC_FIELD){
+      mag_x = bno080_imu.getMagX();
+      mag_y = bno080_imu.getMagY();
+      mag_z = bno080_imu.getMagZ();
+      mag_accuracy = bno080_imu.getMagAccuracy();
+      Serial.println(F("mag"));
+    }
+
+    if(reading_status == SENSOR_REPORTID_ROTATION_VECTOR){
+      quat_i = bno080_imu.getQuatI();
+      quat_j = bno080_imu.getQuatJ();
+      quat_k = bno080_imu.getQuatK();
+      quat_real = bno080_imu.getQuatReal();
+      quat_accuracy = bno080_imu.getQuatAccuracy();
+      quat_radian_accuracy = bno080_imu.getQuatRadianAccuracy();
+      Serial.println(F("quat"));
+    }
+  }
+
+  if (millis() - millis_last_analysis > 2 * imu_output_period_millis){
+    Serial.println(F("*************************************************"));
+    Serial.println(F("***** WARNING: QUAT ANALYSIS FALLING BEHIND *****"));
+    Serial.println(F("*************************************************"));
+    millis_last_analysis = millis();
+  }
+
+  if (millis() - millis_last_analysis >= imu_output_period_millis){
+    millis_last_analysis += imu_output_period_millis;
+
     Serial.println();
-    Serial.print(F("millis start: "));
-    Serial.println(millis());
+    Serial.print(F("millis start analysis: ")); Serial.println(millis());
 
-    float accel_x = bno080_imu.getAccelX();
-    float accel_y = bno080_imu.getAccelY();
-    float accel_z = bno080_imu.getAccelZ();
-    byte accel_accuracy = bno080_imu.getLinAccelAccuracy();
-
-    float gyro_x = bno080_imu.getGyroX();
-    float gyro_y = bno080_imu.getGyroY();
-    float gyro_z = bno080_imu.getGyroZ();
-    byte gyro_accuracy = bno080_imu.getGyroAccuracy();
-
-    float mag_x = bno080_imu.getMagX();
-    float mag_y = bno080_imu.getMagY();
-    float mag_z = bno080_imu.getMagZ();
-    byte mag_accuracy = bno080_imu.getMagAccuracy();
-
-    float quat_i = bno080_imu.getQuatI();
-    float quat_j = bno080_imu.getQuatJ();
-    float quat_k = bno080_imu.getQuatK();
-    float quat_real = bno080_imu.getQuatReal();
-    byte quat_accuracy = bno080_imu.getQuatAccuracy();
-    float quat_radian_accuracry = bno080_imu.getQuatRadianAccuracy();
-
-    Serial.print(F(" -accel: "));
+    Serial.print(F("accel: "));
     Serial.print(accel_x, 4);
     Serial.print(F(", "));
     Serial.print(accel_y, 4);
@@ -88,7 +136,7 @@ void loop() {
     Serial.print(F(", pres: "));
     printAccuracyLevel(accel_accuracy);
 
-    Serial.print(F(" -gyro: "));
+    Serial.print(F(" | gyro: "));
     Serial.print(gyro_x, 4);
     Serial.print(F(", "));
     Serial.print(gyro_y, 4);
@@ -97,7 +145,7 @@ void loop() {
     Serial.print(F(", pres: "));
     printAccuracyLevel(gyro_accuracy);
 
-    Serial.print(F(" -mag: "));
+    Serial.print(F(" | mag: "));
     Serial.print(mag_x, 4);
     Serial.print(F(", "));
     Serial.print(mag_y, 4);
@@ -106,7 +154,7 @@ void loop() {
     Serial.print(F(", pres: "));
     printAccuracyLevel(mag_accuracy);
     
-    Serial.print(F(" -quat: "));
+    Serial.print(F(" | quat: "));
     Serial.print(quat_i, 4);
     Serial.print(F(", "));
     Serial.print(quat_j, 4);
@@ -117,7 +165,7 @@ void loop() {
     Serial.print(F(", pres: "));
     printAccuracyLevel(quat_accuracy);
     Serial.print(F(", "));
-    Serial.print(quat_radian_accuracry, 4);
+    Serial.print(quat_radian_accuracy, 4);
     Serial.println();
 
     // look at quaternion data
@@ -125,6 +173,12 @@ void loop() {
     print(quat_orientation);
     Serial.print(F("quat norm: "));
     Serial.println(quat_orientation.norm());
+
+    if (abs(quat_orientation.norm() - 1.0f) > 1.0e-4){
+      Serial.println(F("**********************************************************************"));
+      Serial.println(F("************************ ERROR: NON INIT QUAT ************************"));
+      Serial.println(F("**********************************************************************"));
+    }
 
     // acceleration in an IMU and ENU referential (the datasheet says it outputs in East North Up rather than North East Down)
     Vector accel_imu_ref{accel_x, accel_y, accel_z};
@@ -145,8 +199,8 @@ void loop() {
     Serial.print(F("IMU X-dir in ENU frame: "));
     print(imu_dir_x_ref_enu);
 
-    Serial.print(F("millis end: "));
-    Serial.println(millis());
+    Serial.print(F("millis end: ")); Serial.println(millis());
+    Serial.println();
   }
 }
 
