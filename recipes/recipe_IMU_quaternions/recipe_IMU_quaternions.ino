@@ -200,7 +200,7 @@ void loop() {
       Serial.println(quat_orientation.norm());
     }
 
-    if (abs(quat_orientation.norm() - 1.0f) > 1.0e-3){
+    if (abs(quat_orientation.norm() - 1.0f) > 1.0e-2){
       Serial.println(F("*************"));
       Serial.println(F("NON UNIT QUAT"));
       Serial.print(F("at ms: ")); Serial.print(millis()); Serial.print(F(", quat norm: ")); Serial.println(quat_orientation.norm());
