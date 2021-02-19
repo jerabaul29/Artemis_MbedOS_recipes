@@ -7,7 +7,12 @@ float dt_seconds = 0.5f;
 float df_hz = 1.0f / dt_seconds;
 
 // signal properties
-float period_second = 5.0f;
+// if the data duration is not a multiple of the period, energy will be distributed a bit around the peak
+// for example: period 5.0f
+// if the data duration is an integer multiple of the period, energy will be onlly at the mode (with uncertainty the rounding errors)
+// for example: period 8.0f
+// the spreading effect can be attenuated by using some windowing (eg Hanning window).
+float period_second = 8.0f;
 float frequency_hz = 1.0f / period_second;
 float amplitude = 2.0f;
 float two_pi = 6.283185f;
@@ -38,7 +43,7 @@ void setup(){
   data_freq_domain = new kiss_fft_cpx[data_len];
   
   for (size_t ind=0; ind<data_len; ind++){
-    data_time_domain[ind].r = amplitude * sin(omega * ind * dt_seconds);
+    data_time_domain[ind].r = amplitude * cos(omega * ind * dt_seconds);
     data_time_domain[ind].i = 0.0f;
   }
 
