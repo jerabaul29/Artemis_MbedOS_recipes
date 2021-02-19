@@ -71,8 +71,8 @@ sh2_SensorValue_t sensorValue;
 
 APM3_WDT wdt;
 
-constexpr unsigned long sample_period_microseconds {5000UL};
-bool constexpr verbose_report {false};
+constexpr unsigned long sample_period_microseconds {50000UL};
+bool constexpr verbose_report {true};
 
 constexpr unsigned long baudrate {115200};
 
@@ -256,7 +256,9 @@ void loop() {
         Serial.print(" y: ");
         Serial.print(sensorValue.un.accelerometer.y);
         Serial.print(" z: ");
-        Serial.println(sensorValue.un.accelerometer.z);
+        Serial.print(sensorValue.un.accelerometer.z);
+        Serial.print(F(" at "));
+        Serial.println(millis());
       }
   
        accel_norm = sqrt(
