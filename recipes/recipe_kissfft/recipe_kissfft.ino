@@ -1,6 +1,9 @@
 #include "Arduino.h"
 #include "kiss_fft.h"
 
+// on my Artemis board with core 1.2.1
+#include "ard_supers/avr/dtostrf.h"
+
 // time base properties
 size_t data_len = 64;
 float dt_seconds = 0.5f;
@@ -26,6 +29,8 @@ kiss_fft_cpx * data_freq_domain;
 
 // a bit of tooling
 void print_vect(kiss_fft_cpx * data, size_t data_len, byte type);
+constexpr size_t format_buff_len {16};
+char format_buff[format_buff_len];
 
 void setup(){
   Serial.begin(115200);
@@ -113,7 +118,20 @@ void print_vect(kiss_fft_cpx * data, size_t data_len, byte type){
         axis_coord = (-(float)data_len + (float)ind) * df_hz / data_len;
       }
     }
-    Serial.print(F("ind : ")); Serial.print(ind); Serial.print(axis_label); Serial.print(axis_coord); Serial.print(F(" | f.r = ")); Serial.print(data[ind].r); Serial.print(F(" | f.i = ")); Serial.print(data[ind].i); Serial.println();
+    Serial.print(F("ind : "));
+    snprintf(format_buff, format_buff_len, "%04i", ind);
+    Serial.print(format_buff);
+    Serial.print(axis_label);
+    //snprintf(format_buff, format_buff_len, "%+05.2f", axis_coord);  // no snprintf for %f in arduino...
+    dtostrf(axis_coord, 12, 4, format_buff);
+    Serial.print(format_buff);
+    Serial.print(F(" | f.r = "));
+    dtostrf(data[ind].r, 12, 4, format_buff);
+    Serial.print(format_buff);
+    Serial.print(F(" | f.i = "));
+    dtostrf(data[ind].r, 12, 4, format_buff);
+    Serial.print(format_buff);
+    Serial.println();
   }
   Serial.println(F("------------------------------------"));
 }
