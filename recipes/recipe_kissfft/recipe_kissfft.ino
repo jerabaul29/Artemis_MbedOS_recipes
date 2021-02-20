@@ -7,7 +7,7 @@
 // time base properties
 // the highest frequency for which get some information is the Nyquist frequency, i.e. df_hz / 2
 // the frequency resolution is related to the length of the signal: freq_resolution = 2.0 * 1.0 / (data_len * dt_seconds) // TODO: check if a -1 somewhere
-size_t data_len = 128;
+size_t data_len = 8192;
 float dt_seconds = 0.5f;
 float df_hz = 1.0f / dt_seconds;
 
@@ -17,11 +17,13 @@ float df_hz = 1.0f / dt_seconds;
 // if the data duration is an integer multiple of the period, energy will be onlly at the mode (with uncertainty the rounding errors)
 // for example: period 8.0f
 // the spreading effect can be attenuated by using some windowing (eg hamming window).
-float period_second = 8.0f;
+float period_second = 5.0f;
 float frequency_hz = 1.0f / period_second;
 float amplitude = 2.0f;
 float two_pi = 6.283185f;
 float omega = two_pi * frequency_hz;
+
+unsigned long millis_fft_start;
 
 // our objects for taking fft: data in and out, config
 kiss_fft_cfg my_cfg_fft;
@@ -50,8 +52,18 @@ void setup(){
   my_cfg_fft  = kiss_fft_alloc(data_len, 0, NULL, NULL);
   my_cfg_ifft = kiss_fft_alloc(data_len, 1, NULL, NULL);
 
-  bool use_hamming_window {true};
+  Serial.print(F("we are taking FFTs of size: ")); Serial.println(data_len);
+  Serial.print(F("kiss_fft_alloc allocated a memory buffer with size: ")); Serial.println(memneeded_copy);
+  Serial.print(F("the data buffers for data in and out have size: ")); Serial.println(data_len * sizeof(kiss_fft_cpx));
+
+  bool use_hamming_window {false};
   bool print_as_pure_csv  {true};
+  bool print_vectors      {false};
+
+  // I will save you a loong serial output...
+  if (data_len > 128){
+    print_vectors = false;
+  }
 
   // --------------------------------------------------------------
   // generate the initial signal
@@ -69,16 +81,23 @@ void setup(){
 
   Serial.println(F("FFT example"));
 
-  print_vect(data_time_domain, data_len, 0, print_as_pure_csv);
+  if (print_vectors){
+    print_vect(data_time_domain, data_len, 0, print_as_pure_csv);
+  }
 
   if (use_hamming_window){
     apply_hamming(data_time_domain, data_len);
   }
     
+  millis_fft_start = millis();
   kiss_fft(my_cfg_fft, data_time_domain, data_freq_domain);
+  Serial.print(F("FFT took ")); Serial.print(millis()-millis_fft_start); Serial.println(F(" ms"));
+
   apply_fft_scaling_sqrtN(data_freq_domain, data_len, 0);
 
-  print_vect(data_freq_domain, data_len, 1, print_as_pure_csv);
+  if (print_vectors){
+    print_vect(data_freq_domain, data_len, 1, print_as_pure_csv);
+  }
 
   // --------------------------------------------------------------
   // erase the time domain data
@@ -95,9 +114,14 @@ void setup(){
 
   Serial.println(F("IFFT example"));
 
-  print_vect(data_freq_domain, data_len, 1, print_as_pure_csv);
+  if (print_vectors){
+    print_vect(data_freq_domain, data_len, 1, print_as_pure_csv);
+  }
 
+  millis_fft_start = millis();
   kiss_fft(my_cfg_ifft, data_freq_domain, data_time_domain);
+  Serial.print(F("FFT took ")); Serial.print(millis()-millis_fft_start); Serial.println(F(" ms"));
+
   apply_fft_scaling_sqrtN(data_time_domain, data_len, 1);
 
   // scale on the way back
@@ -106,7 +130,9 @@ void setup(){
     data_time_domain[ind].i /= (float)data_len;
   }
 
-  print_vect(data_time_domain, data_len, 0, print_as_pure_csv);
+  if (print_vectors){
+    print_vect(data_time_domain, data_len, 0, print_as_pure_csv);
+  }
 
   Serial.println(F("done"));
 }
@@ -250,3 +276,5 @@ void apply_fft_scaling_sqrtN(kiss_fft_cpx * data, size_t data_len, byte type){
 // TODO: clear unused functions
 // TODO: is kiss_fft_cpx aware of its size? If yes, drop the size_t data_len arguments and use the struct value
 // TODO: plot the FFTs with / without windowing, just to check
+
+// NOTE: this code allocates; could also provide a version with static memory allocation at the start

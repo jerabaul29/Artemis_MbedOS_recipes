@@ -6,7 +6,6 @@
  *  See COPYING file for more information.
  */
 
-
 #include "_kiss_fft_guts.h"
 /* The guts header contains all the multiplication and addition macros that are defined for
  fixed or floating point complex numbers.  It also delares the kf_ internal functions.
@@ -327,6 +326,8 @@ void kf_factor(int n,int * facbuf)
     } while (n > 1);
 }
 
+size_t memneeded_copy;
+
 /*
  *
  * User-callable function to allocate all necessary storage space for the fft.
@@ -341,6 +342,8 @@ kiss_fft_cfg kiss_fft_alloc(int nfft,int inverse_fft,void * mem,size_t * lenmem 
     kiss_fft_cfg st=NULL;
     size_t memneeded = KISS_FFT_ALIGN_SIZE_UP(sizeof(struct kiss_fft_state)
         + sizeof(kiss_fft_cpx)*(nfft-1)); /* twiddle factors*/
+
+    memneeded_copy = memneeded;
 
     if ( lenmem==NULL ) {
         st = ( kiss_fft_cfg)KISS_FFT_MALLOC( memneeded );

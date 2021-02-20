@@ -14,6 +14,8 @@
 #include <math.h>
 #include <string.h>
 
+extern size_t memneeded_copy;
+
 // Define KISS_FFT_SHARED macro to properly export symbols
 #ifdef KISS_FFT_SHARED
 # ifdef _WIN32
