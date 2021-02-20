@@ -5,7 +5,9 @@
 #include "ard_supers/avr/dtostrf.h"
 
 // time base properties
-size_t data_len = 64;
+// the highest frequency for which get some information is the Nyquist frequency, i.e. df_hz / 2
+// the frequency resolution is related to the length of the signal: freq_resolution = 2.0 * 1.0 / (data_len * dt_seconds) // TODO: check if a -1 somewhere
+size_t data_len = 128;
 float dt_seconds = 0.5f;
 float df_hz = 1.0f / dt_seconds;
 
@@ -14,7 +16,7 @@ float df_hz = 1.0f / dt_seconds;
 // for example: period 5.0f
 // if the data duration is an integer multiple of the period, energy will be onlly at the mode (with uncertainty the rounding errors)
 // for example: period 8.0f
-// the spreading effect can be attenuated by using some windowing (eg Hanning window).
+// the spreading effect can be attenuated by using some windowing (eg hamming window).
 float period_second = 8.0f;
 float frequency_hz = 1.0f / period_second;
 float amplitude = 2.0f;
@@ -28,23 +30,33 @@ kiss_fft_cpx * data_time_domain;
 kiss_fft_cpx * data_freq_domain;
 
 // a bit of tooling
-void print_vect(kiss_fft_cpx * data, size_t data_len, byte type);
+void print_vect(kiss_fft_cpx * data, size_t data_len, byte type, bool flag_pure_csv=false);
 constexpr size_t format_buff_len {16};
 char format_buff[format_buff_len];
+float hamming_coeff_amplitude_compensated(size_t crrt_ind, size_t total_fft_len);
+float energy_content(kiss_fft_cpx data, size_t data_len);
+void apply_fft_scaling_sqrtN(kiss_fft_cpx * data, size_t data_len, byte type);
+void apply_hamming(kiss_fft_cpx * data, size_t data_len);
 
 void setup(){
   Serial.begin(115200);
   delay(10);
   Serial.println();
-  Serial.println(F("------ booted ------"));
+  Serial.println(F("------------------------------------- booted -------------------------------------"));
+
+  // --------------------------------------------------------------
+  // a bit of preparation
 
   my_cfg_fft  = kiss_fft_alloc(data_len, 0, NULL, NULL);
   my_cfg_ifft = kiss_fft_alloc(data_len, 1, NULL, NULL);
 
+  bool use_hamming_window {true};
+  bool print_as_pure_csv  {true};
+
   // --------------------------------------------------------------
-  // generate the signal
+  // generate the initial signal
   
-  data_time_domain  = new kiss_fft_cpx[data_len];
+  data_time_domain = new kiss_fft_cpx[data_len];
   data_freq_domain = new kiss_fft_cpx[data_len];
   
   for (size_t ind=0; ind<data_len; ind++){
@@ -53,15 +65,25 @@ void setup(){
   }
 
   // --------------------------------------------------------------
-  // perform the fft
+  // perform the FFT
+
+  Serial.println(F("FFT example"));
+
+  print_vect(data_time_domain, data_len, 0, print_as_pure_csv);
+
+  if (use_hamming_window){
+    apply_hamming(data_time_domain, data_len);
+  }
     
   kiss_fft(my_cfg_fft, data_time_domain, data_freq_domain);
+  apply_fft_scaling_sqrtN(data_freq_domain, data_len, 0);
 
-  print_vect(data_time_domain, data_len, 0);
-  print_vect(data_freq_domain, data_len, 1);
+  print_vect(data_freq_domain, data_len, 1, print_as_pure_csv);
 
   // --------------------------------------------------------------
   // erase the time domain data
+
+  Serial.println(F("erase the time domain to prepare checking FFT"));
 
   for (size_t ind=0; ind<data_len; ind++){
     data_time_domain[ind].r = 0.0f;
@@ -69,9 +91,14 @@ void setup(){
   }
 
   // --------------------------------------------------------------
-  // perform the ifft
+  // perform the IFFT
+
+  Serial.println(F("IFFT example"));
+
+  print_vect(data_freq_domain, data_len, 1, print_as_pure_csv);
 
   kiss_fft(my_cfg_ifft, data_freq_domain, data_time_domain);
+  apply_fft_scaling_sqrtN(data_time_domain, data_len, 1);
 
   // scale on the way back
   for (size_t ind=0; ind<data_len; ind++){
@@ -79,8 +106,7 @@ void setup(){
     data_time_domain[ind].i /= (float)data_len;
   }
 
-  print_vect(data_time_domain, data_len, 0);
-  print_vect(data_freq_domain, data_len, 1);
+  print_vect(data_time_domain, data_len, 0, print_as_pure_csv);
 
   Serial.println(F("done"));
 }
@@ -89,19 +115,27 @@ void loop(){
   
 }
 
+// out tooling
+
 // type: 0 for time domain, 1 for frequency domain
-void print_vect(kiss_fft_cpx * data, size_t data_len, byte type){
+void print_vect(kiss_fft_cpx * data, size_t data_len, byte type, bool flag_pure_csv){
   Serial.println(F("------------------------------------"));
   
-  char * axis_label;
+  __FlashStringHelper const * axis_label;
+  __FlashStringHelper const * axis_label_header;
+  
   if (type == 0){
     Serial.println(F("time domain vector"));
-    axis_label = " | t = ";
+    axis_label = F(" | t = ");
+    axis_label_header = F("time, ");
   }
   else{
     Serial.println(F("freq domain vector"));
-    axis_label = " | f = ";
+    axis_label = F(" | f = ");
+    axis_label_header = F("freq, ");
   }
+
+  Serial.print(F("ind, ")); Serial.print(axis_label_header); Serial.println(F("real, imaginary"));
 
   float axis_coord;
 
@@ -118,36 +152,101 @@ void print_vect(kiss_fft_cpx * data, size_t data_len, byte type){
         axis_coord = (-(float)data_len + (float)ind) * df_hz / data_len;
       }
     }
-    Serial.print(F("ind : "));
+    if (!flag_pure_csv){
+        Serial.print(F("ind : "));
+    }
     snprintf(format_buff, format_buff_len, "%04i", ind);
     Serial.print(format_buff);
-    Serial.print(axis_label);
+    if (!flag_pure_csv){
+      Serial.print(axis_label);
+    }
+    else{
+      Serial.print(F(", "));
+    }
     //snprintf(format_buff, format_buff_len, "%+05.2f", axis_coord);  // no snprintf for %f in arduino...
     dtostrf(axis_coord, 12, 4, format_buff);
     Serial.print(format_buff);
-    Serial.print(F(" | f.r = "));
+    if (!flag_pure_csv){
+      Serial.print(F(" | f.r = "));
+    }
+    else{
+      Serial.print(F(", "));
+    }
     dtostrf(data[ind].r, 12, 4, format_buff);
     Serial.print(format_buff);
-    Serial.print(F(" | f.i = "));
-    dtostrf(data[ind].r, 12, 4, format_buff);
+    if (!flag_pure_csv){
+      Serial.print(F(" | f.i = "));
+    }
+    else{
+      Serial.print(F(", "));
+    }
+    dtostrf(data[ind].i, 12, 4, format_buff);
     Serial.print(format_buff);
     Serial.println();
   }
+  Serial.print(F("total energy content: ")); Serial.println(energy_content(data, data_len));
   Serial.println(F("------------------------------------"));
 }
 
+float hamming_coeff_amplitude_compensated(size_t crrt_ind, size_t total_fft_len){
+  // implementing the hamming window as described in: https://numpy.org/doc/stable/reference/generated/numpy.hamming.html
+  // using the amplitude compensation coefficient as described in: https://www.physik.uzh.ch/local/teaching/SPI301/LV-2015-Help/lvanlsconcepts.chm/Scaling_Smoothing_Windows.html, https://community.sw.siemens.com/s/article/window-correction-factors
+  // windowing is a bit tricky: it changes the amplitude / energy content, and one CANNOT preserve both amplitude and total enery while applying some non trivial windowing,
+  // i.e. only the Uniform window, which is equivalent to no window, has the same amplitude and energy correction factors
 
-/*
+  // TODO: add a flag to choose which to conserve
+  
+  // float amplitude_scaling_coefficient = 1.85f// that is the correction so that amplitude at the peak is conserved, i.e. 1.0f / 0.54f
+  float amplitude_scaling_coefficient = 1.59f;  // that is the correction so that the total energy is conserved
+  
+  float phase_coefficient = two_pi * (float)(crrt_ind) / (float)(total_fft_len - 1);
+  float amplitude_compensated_hamming_coef = (0.54f - 0.46f * cos(phase_coefficient)) * amplitude_scaling_coefficient;
 
-use:
+  return amplitude_compensated_hamming_coef;
+}
 
-kiss_fft_cfg cfg = kiss_fft_alloc( nfft ,is_inverse_fft ,0,0 );
-    while ...
-    
-        ... // put kth sample in cx_in[k].r and cx_in[k].i
-        
-        kiss_fft( cfg , cx_in , cx_out );
-        
-        ... // transformed. DC is in cx_out[0].r and cx_out[0].i 
+// TODO: fixme: do the hamming computation inside the function to avoid re calculating scaling and casts all the time
+void apply_hamming(kiss_fft_cpx * data, size_t data_len){
+  float crrt_hamming_coeff;
+  for (size_t crrt_ind=0; crrt_ind<data_len; crrt_ind++){
+    crrt_hamming_coeff = hamming_coeff_amplitude_compensated(crrt_ind, data_len);
+    data[crrt_ind].r *= crrt_hamming_coeff;
+    data[crrt_ind].i *= crrt_hamming_coeff;
+  }
+}
 
- */
+float energy_content(kiss_fft_cpx * data, size_t data_len){
+  float total_energy = 0;
+
+  for (size_t ind=0; ind<data_len; ind++){
+    total_energy += data[ind].r * data[ind].r + data[ind].i * data[ind].i;
+  }
+
+  return total_energy;
+}
+
+
+// apply scaling so that each FFT scales with sqrt(N), instead of N for forward FFT, and 1/N for backwards FFT which is the current convention.
+// that makes energy directly conserved in Parsevals theorem instead of having a factor in difference
+void apply_fft_scaling_sqrtN(kiss_fft_cpx * data, size_t data_len, byte type){
+  if (type == 1){
+    float scaling_factor = sqrt((float)(data_len));
+    for (size_t ind=0; ind<data_len; ind++){
+      data[ind].r *= scaling_factor;
+      data[ind].i *= scaling_factor;
+    }
+  }
+  else if (type == 0){
+    float scaling_factor = sqrt(1.0f / (float)(data_len));
+    for (size_t ind=0; ind<data_len; ind++){
+      data[ind].r *= scaling_factor;
+      data[ind].i *= scaling_factor;
+    }
+  }
+}
+
+// TODO: apply_fft_scaling_sqrtN, energy_content, etc, should directly take a my_cfg_ifft
+// TODO: hamming should directly take a my_cfg_ifft
+// TODO: clear unused functions
+// TODO: is kiss_fft_cpx aware of its size? If yes, drop the size_t data_len arguments and use the struct value
+// TODO: plot the FFTs with / without windowing, just to check
