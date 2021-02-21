@@ -7,8 +7,8 @@
 // time base properties
 // the highest frequency for which get some information is the Nyquist frequency, i.e. df_hz / 2
 // the frequency resolution is related to the length of the signal: freq_resolution = 2.0 * 1.0 / (data_len * dt_seconds) // TODO: check if a -1 somewhere
-size_t data_len = 8192;
-float dt_seconds = 0.5f;
+size_t data_len = 1024;
+float dt_seconds = 0.1f;
 float df_hz = 1.0f / dt_seconds;
 
 // signal properties
@@ -17,7 +17,7 @@ float df_hz = 1.0f / dt_seconds;
 // if the data duration is an integer multiple of the period, energy will be onlly at the mode (with uncertainty the rounding errors)
 // for example: period 8.0f
 // the spreading effect can be attenuated by using some windowing (eg hamming window).
-float period_second = 5.0f;
+float period_second = 4.0f;
 float frequency_hz = 1.0f / period_second;
 float amplitude = 2.0f;
 float two_pi = 6.283185f;
@@ -41,7 +41,7 @@ void apply_fft_scaling_sqrtN(kiss_fft_cpx * data, size_t data_len, byte type);
 void apply_hamming(kiss_fft_cpx * data, size_t data_len);
 
 void setup(){
-  Serial.begin(115200);
+  Serial.begin(230400);
   delay(10);
   Serial.println();
   Serial.println(F("------------------------------------- booted -------------------------------------"));
@@ -58,12 +58,7 @@ void setup(){
 
   bool use_hamming_window {false};
   bool print_as_pure_csv  {true};
-  bool print_vectors      {false};
-
-  // I will save you a loong serial output...
-  if (data_len > 128){
-    print_vectors = false;
-  }
+  bool print_vectors      {true};
 
   // --------------------------------------------------------------
   // generate the initial signal
@@ -278,3 +273,5 @@ void apply_fft_scaling_sqrtN(kiss_fft_cpx * data, size_t data_len, byte type){
 // TODO: plot the FFTs with / without windowing, just to check
 
 // NOTE: this code allocates; could also provide a version with static memory allocation at the start
+
+// TODO: show how to perform all of this statically
