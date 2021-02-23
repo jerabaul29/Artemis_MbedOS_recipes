@@ -3,13 +3,14 @@
 #include "Arduino.h"
 #include "Adafruit_BNO08x_RVC.h"
 
-// our communications
+// our communications and object for receiving these
 Adafruit_BNO08x_RVC rvc = Adafruit_BNO08x_RVC();
 BNO08x_RVC_Data heading;
 
+// our current bno serial
 Uart serial_bno_vcr{1, 9, 8};
 
-// a few helper functions
+// a few helper functions for doing rotations
 void apply_yaw(float &vx, float &vy, float &vz, float const &yaw_rad){
   float vvx = vx;
   float vvy = vy;
@@ -56,11 +57,6 @@ float roll_rad;
 float accx;
 float accy;
 float accz;
-/*
-float r_accx;
-float r_accy;
-float r_accz;
-*/
 
 // a few constants
 float twopi = 6.283185307179586;
@@ -113,6 +109,7 @@ void loop() {
   
   // getting everyting in the right dimension
   // all of this is, "in which direction did I move"? and "in IMU frame of reference"
+  // some things were a bit messed up
   yaw_rad = -heading.yaw * twopi / 360.0f;
   pitch_rad = heading.roll * twopi / 360.0f;
   roll_rad = heading.pitch * twopi / 360.0f;
@@ -161,6 +158,4 @@ void loop() {
   */
   Serial.print(F(" | acc down: "));
   Serial.println(accz, 2);
-  
-
 }
