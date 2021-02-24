@@ -7,7 +7,7 @@
 // time base properties
 // the highest frequency for which get some information is the Nyquist frequency, i.e. df_hz / 2
 // the frequency resolution is related to the length of the signal: freq_resolution = 2.0 * 1.0 / (data_len * dt_seconds) // TODO: check if a -1 somewhere
-size_t data_len = 1024;
+size_t data_len = 2048;
 float dt_seconds = 0.1f;
 float df_hz = 1.0f / dt_seconds;
 
@@ -41,7 +41,7 @@ void apply_fft_scaling_sqrtN(kiss_fft_cpx * data, size_t data_len, byte type);
 void apply_hamming(kiss_fft_cpx * data, size_t data_len);
 
 void setup(){
-  Serial.begin(230400);
+  Serial.begin(1000000);
   delay(10);
   Serial.println();
   Serial.println(F("------------------------------------- booted -------------------------------------"));
