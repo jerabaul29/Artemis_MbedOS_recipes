@@ -65,7 +65,7 @@ float twopi = 6.283185307179586;
 
 void setup() {
   // Wait for serial monitor to open
-  Serial.begin(115200);
+  Serial.begin(1000000);
   while (!Serial)
     delay(10);
 
