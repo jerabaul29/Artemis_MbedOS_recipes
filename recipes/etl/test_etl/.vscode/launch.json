@@ -1,0 +1,34 @@
+// AUTOMATICALLY GENERATED FILE. PLEASE DO NOT MODIFY IT MANUALLY
+
+// PIO Unified Debugger
+//
+// Documentation: https://docs.platformio.org/page/plus/debugging.html
+// Configuration: https://docs.platformio.org/page/projectconf/section_env_debug.html
+
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "platformio-debug",
+            "request": "launch",
+            "name": "PIO Debug",
+            "executable": "/home/jrmet/Desktop/Git/Artemis_MbedOS_recipes/recipes/etl/test_etl/.pio/build/SparkFun_RedBoard_Artemis/program",
+            "projectEnvName": "SparkFun_RedBoard_Artemis",
+            "toolchainBinDir": "/home/jrmet/.platformio/packages/toolchain-gccarmnoneeabi/bin",
+            "preLaunchTask": {
+                "type": "PlatformIO",
+                "task": "Pre-Debug"
+            },
+            "internalConsoleOptions": "openOnSessionStart"
+        },
+        {
+            "type": "platformio-debug",
+            "request": "launch",
+            "name": "PIO Debug (skip Pre-Debug)",
+            "executable": "/home/jrmet/Desktop/Git/Artemis_MbedOS_recipes/recipes/etl/test_etl/.pio/build/SparkFun_RedBoard_Artemis/program",
+            "projectEnvName": "SparkFun_RedBoard_Artemis",
+            "toolchainBinDir": "/home/jrmet/.platformio/packages/toolchain-gccarmnoneeabi/bin",
+            "internalConsoleOptions": "openOnSessionStart"
+        }
+    ]
+}
