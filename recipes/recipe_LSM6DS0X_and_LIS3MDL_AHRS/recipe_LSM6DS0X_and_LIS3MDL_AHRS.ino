@@ -11,6 +11,7 @@
 #include "Arduino.h"
 #include <Adafruit_Sensor_Calibration.h>
 #include <Adafruit_AHRS.h>
+#include "kiss_clang_3d.h"
 
 Adafruit_Sensor *accelerometer, *gyroscope, *magnetometer;
 
@@ -39,6 +40,8 @@ Adafruit_NXPSensorFusion filter; // slowest
 uint32_t timestamp;
 
 void setup() {
+  delay(500);
+  
   Serial.begin(1000000);
   while (!Serial) yield();
 
@@ -48,9 +51,9 @@ void setup() {
     Serial.println("No calibration loaded/found");
   }
 
-  if (!init_sensors()) {
-    Serial.println("Failed to find sensors");
-    while (1) delay(10);
+  while (!init_sensors()) {  // it looks like the sensor takes a tiny bit of time to wake up and be available
+    Serial.println("Failed to find sensors; are things correctly connected, are you using the right core?");
+    delay(100);
   }
   
   accelerometer->printSensorDetails();
@@ -160,6 +163,21 @@ void loop() {
 #if defined(AHRS_DEBUG_OUTPUT)
   Serial.print("Printing took "); Serial.print(micros()-timestamp); Serial.println(" us");
 #endif
+
+  // perform the quaternion transform to go into a NED or similar referential
+  vec3 accel_raw;
+  vec3 accel_NED;
+  quat quat_rotation;
+  
+  vec3_setter(&accel_raw, accel.acceleration.x, accel.acceleration.y, accel.acceleration.z);
+  quat_setter(&quat_rotation, qw, qx, qy, qz);
+  rotate_by_quat_R(&accel_raw, &quat_rotation, &accel_NED);
+  
+  Serial.print("rotated acc: ");
+  Serial.print(accel_NED.i, 4); Serial.print(", ");
+  Serial.print(accel_NED.j, 4); Serial.print(", ");
+  Serial.print(accel_NED.k, 4); Serial.print(", ");
+  Serial.println();
 }
 
 /*
@@ -182,5 +200,17 @@ Raw acc: -2.3982, -3.7908, 8.9773,  | gyr: 0.2450, -0.2800, -0.3325,  | mag: 23.
 Orientation: 43.27, 13.82, -22.90
 Quaternion: 0.8956, -0.2266, 0.0369, 0.3809
 Printing took 4729 us
+
+------------------
+
+some rough notes about the speed of I2C:
+
+- if it takes 10 bytes to send one reading back and forth (asking, acking, checksumming, etc) [note: this may be very conservative]
+- if we ask for 9 quantities
+- then it is 90 bytes per "full reading"
+- i.e. around 1000 bits per "full reading"
+
+now if the I2C clock is 4.10^5, this means that I2C transmission will take 10^3 bits / 4.10^5 bits/s ie around 2.5ms, which is consistent with what is observed.
+however, well possible that each quantity needs much less than 10 bytes. Them question of why transmissions are so slow.
 
 */
