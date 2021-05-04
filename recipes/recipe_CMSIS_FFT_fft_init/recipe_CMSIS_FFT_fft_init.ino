@@ -7,7 +7,7 @@
 // admissible rfft lengths as well as some documentation are available at
 // https://www.keil.com/pack/doc/CMSIS/DSP/html/group__RealFFT.html#gac5fceb172551e7c11eb4d0e17ef15aa3
 // fft number of samples, i.e. length
-constexpr int SAMPLES  = 64; 
+constexpr int SAMPLES  = 32; 
 constexpr uint8_t forward_fft = 0;
 constexpr uint8_t backward_fft = 1;
 
@@ -28,6 +28,9 @@ float32_t fft_output[SAMPLES];
 
 // this can either be filled in the code (as is done here), or use a precomputed table (need arm_const_structs.h).
 arm_rfft_fast_instance_f32 crrt_arm_rfft_fast_instance_f32;
+
+// getting our status back
+arm_status crrt_arm_status;
 
 // a bit of helper for printing stuff in a nicer format
 constexpr size_t length_format_buffer {64};
@@ -66,11 +69,11 @@ void setup() {
 
   // compute a FFT
   Serial.println(F("start init fast struct"));
-  arm_rfft_fast_init_f32(&crrt_arm_rfft_fast_instance_f32, SAMPLES);                          // get ready
-  Serial.println(F("done init fast struct"));
+  crrt_arm_status = arm_rfft_fast_init_f32(&crrt_arm_rfft_fast_instance_f32, SAMPLES);                          // get ready
+  Serial.print(F("done init fast struct, status: ")); Serial.println(crrt_arm_status);
   Serial.println(F("start take FFT"));
-  arm_rfft_fast_f32(&crrt_arm_rfft_fast_instance_f32, fft_input, fft_output, forward_fft);    // take the FFT
-  Serial.println(F("done take FFT"));
+  arm_rfft_fast_f32(&crrt_arm_rfft_fast_instance_f32, fft_input, fft_output, forward_fft);    // take the FFT; no status here!
+  Serial.print(F("done take FFT")); Serial.println();
   Serial.println();
 
   Serial.println(F("output signal"));
