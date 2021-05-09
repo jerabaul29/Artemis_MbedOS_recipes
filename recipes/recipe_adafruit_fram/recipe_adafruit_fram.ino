@@ -46,7 +46,7 @@ int32_t readBack(uint32_t addr, int32_t data) {
 
 bool testAddrSize(uint8_t addrSize) {
   fram.setAddressSize(addrSize);
-  if (readBack(4, 0xbeefbead) == 0xbeefbead)
+  if (readBack(32, 0xbeefbead) == 0xbeefbead)
     return true;
   return false;
 }
@@ -79,10 +79,11 @@ void setup(){
     while (1);
   }
   
-  memSize = 0;
+  memSize = 256;
+  Serial.println(F("check how many blocks are available, this may take a few secs"));
   while (readBack(memSize, memSize) == memSize) {
     memSize += 256;
-    //Serial.print("Block: #"); Serial.println(memSize/256);
+    // Serial.print("Block: #"); Serial.println(memSize/256);  // disable the printing, as this is many lines...
   }
   
   Serial.print("SPI FRAM address size is ");
@@ -94,6 +95,33 @@ void setup(){
   Serial.print((memSize*8)/0x400); Serial.println(" kilobits");
   if (memSize >= (0x100000/8)) {
     Serial.print((memSize*8)/0x100000); Serial.println(" megabits");
+  }
+
+  // Read the first byte
+  uint8_t test = fram.read8(0x0);
+  Serial.print("Restarted "); Serial.print(test); Serial.println(" times");
+
+  // Test write ++
+  fram.writeEnable(true);
+  fram.write8(0x0, test+1);
+  fram.writeEnable(false);
+
+  fram.writeEnable(true);
+  fram.write(0x1, (uint8_t *)"FTW!", 5);
+  fram.writeEnable(false);
+
+  // dump the entire 512K of memory!
+  uint8_t value;
+  // for (uint16_t a = 0; a < 524288; a++) {  // this is a lot...
+  for (uint16_t a = 0; a < 1024; a++) {  // let us dump a bit less!
+    value = fram.read8(a);
+    if ((a % 32) == 0) {
+      Serial.print("\n 0x"); Serial.print(a, HEX); Serial.print(": ");
+    }
+    Serial.print("0x"); 
+    if (value < 0x1) 
+      Serial.print('0');
+    Serial.print(value, HEX); Serial.print(" ");
   }
 }
 
