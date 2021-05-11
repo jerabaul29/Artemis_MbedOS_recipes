@@ -1,6 +1,8 @@
 #ifndef STAT_PROCESSING
 #define STAT_PROCESSING
 
+#include "Arduino.h"
+
 #include "etl.h"
 #include "etl/vector.h"
 
