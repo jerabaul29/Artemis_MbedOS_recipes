@@ -8,96 +8,137 @@
 
 #include "math.h"
 
+#ifndef STAT_PROCESSING_VERBOSE
+  #define STAT_PROCESSING_VERBOSE 0
+#endif
+
+// a n-sigma filter, i.e. compute the mean based on only the values of the array that are with n standard deviations of the mean
+// we do it here taking great care to not overflow and keep as high accuracy as possible; this is in case we for example use some integral types
+// and need high accuracy on these (for example, working with lat and lon data represented as int or long)
 template <typename T>
-T sigma_filter(etl::ivector<T> const & vec_in, float n_sigma=3, bool verbose=false){
-        static_assert(std::is_signed<T>::value, "signed values only");
+T accurate_sigma_filter(etl::ivector<T> const & vec_in, double n_sigma=2.0, bool verbose=false){
+  static_assert(std::is_signed<T>::value, "signed values only; we rely on signed arithmetics to compute the mean while avoiding overflows");
 
-    // we first take a coarse mean, in such a way that we cannot overflow
-    T mean_coarse {0};
+  // we need to use a n_sigma that is large enough to make sure we have at least a sample; 1.0 should be enough, see 
+  // https://stats.stackexchange.com/questions/524011/how-many-standard-deviations-around-the-mean-do-i-need-to-guarantee-covering-at/524014#524014
+  // for a bit of margin, take 1.5
+  // is n_sigma too low? Increase it
+  if (n_sigma < 1.5){
+    n_sigma = 1.5;
+    #if STAT_PROCESSING_VERBOSE
+      Serial.println(F("we were using unsafe small n_sigma; set it to 1.5"));
+    #endif
+  }
 
-    for (size_t index=0; index<vec_in.size(); index++){
-            mean_coarse += vec_in[index] / static_cast<T>(vec_in.size());
+  // do we have a vec of length 0? if this is the case, return default value 0
+  if (vec_in.size() == 0){
+    #if STAT_PROCESSING_VERBOSE
+      Serial.println(F("empty vector, return 0"));
+    #endif
+    return 0;
+  }
+
+  // are all points equal? If this is the case, no need to compute anything
+  T first_elem = vec_in[0];
+  bool all_equal = true;
+  for (int ind=0; ind<vec_in.size(); ind++){
+    if (first_elem != vec_in[ind]){
+      all_equal = false;
+      break;
     }
+  }
 
-    if (verbose){
-          Serial.print(F("mean_coarse: ")); Serial.println(mean_coarse);
-    }
+  // all elements are equal, just return the first element
+  if (all_equal){
+    #if STAT_PROCESSING_VERBOSE
+      Serial.println(F("all elements equal, use the first element"));
+    #endif
+    return first_elem;
+  }
 
-    // then we need to compute the mean and mean of square when we have removed the coarse mean
-    T mean{0};
-    T mean_of_squares {0};
+  // we now know that we have a vector that is non empty and that not all elements there are equal; can apply a n-sigma
+  // filtering safely, as long as no overflow... We take great care to 1) not overflow 2) get as high accuracy as possible
 
-    for (size_t index=0; index<vec_in.size(); index++){
-            mean += vec_in[index] - mean_coarse;
-        mean_of_squares += (vec_in[index] - mean_coarse) * (vec_in[index] - mean_coarse);
-    }
-
-    mean /= vec_in.size();
-    mean_of_squares /= vec_in.size();
-
-    if (verbose){
-          Serial.print(F("mean (without the coarse part): ")); Serial.println(mean);
-          Serial.print(F("mean_of_squares (witout the coarse part): ")); Serial.println(mean_of_squares);
-    }
-
-    // now we can compute the std estimate 
-    T std_estimate {0};
-
-    std_estimate = static_cast<T>(std::sqrt(static_cast<double>(
-            mean_of_squares - mean * mean
-    )));
+  // start by finding out which elements should be kept for calculating the mean; this is all done in double to avoid overflows
     
-    if (verbose){
-          Serial.print(F("std_estimate: ")); Serial.println(std_estimate);
+  double vec_len_as_double = static_cast<double>(vec_in.size());
+
+  // calculate the double mean
+  double double_mean {0.0};
+  for (int ind=0; ind<vec_in.size(); ind++){
+    double crrt_value = static_cast<double>(vec_in[ind]);
+    double_mean += crrt_value / vec_len_as_double; 
+  }
+
+  #if STAT_PROCESSING_VERBOSE
+    Serial.print(F("double_mean = ")); Serial.println(double_mean);
+  #endif
+
+  // calculate the double rms
+  double double_rms {0.0};
+  for (int ind=0; ind<vec_in.size(); ind++){
+    double crrt_value = static_cast<double>(vec_in[ind]);
+    double_rms += (crrt_value - double_mean) * (crrt_value - double_mean) / vec_len_as_double;
+  }
+
+  #if STAT_PROCESSING_VERBOSE
+    Serial.print(F("double_rms = ")); Serial.println(double_rms);
+  #endif
+
+  // calculate the double std
+  double double_std {0};
+  double_std = sqrt(double_rms);
+
+  // calculate the max distance
+  double double_max_distance = n_sigma * double_std; 
+
+  #if STAT_PROCESSING_VERBOSE
+    Serial.print(F("double_std = ")); Serial.println(double_std);
+    Serial.print(F("double_max_distance = ")); Serial.println(double_max_distance);
+  #endif
+
+  // find out the coarse mean with only the points that should be used for calculating
+  // compute in double first and divide after, to avoid overflows
+  double double_coarse_mean {0.0};
+  int nbr_of_valid_points {0};
+
+  for (int ind=0; ind<vec_in.size(); ind++){
+    double crrt_value = static_cast<double>(vec_in[ind]);
+    if (fabs(crrt_value - double_mean) <= double_max_distance){
+      double_coarse_mean += crrt_value;
+      nbr_of_valid_points ++;
     }
+  }
 
-    // now compute the filtered mean, with a n_sigma filter
+  double_coarse_mean /= static_cast<double>(nbr_of_valid_points);
 
-    // just the number of sigmas we want to use, as a T type
-    T n_sigma_native = static_cast<T>(n_sigma);
+  T coarse_mean = static_cast<T>(double_coarse_mean);
 
-    if ((n_sigma_native == 0) || (std_estimate == 0)){
-          return (mean + mean_coarse);
+  #if STAT_PROCESSING_VERBOSE
+    Serial.print(F("nbr_of_valid_points ")); Serial.println(nbr_of_valid_points);
+    Serial.print(F("coarse_mean = ")); Serial.println(coarse_mean);
+  #endif
+
+  // find out the fine mean (relative to the coarse mean)
+  T fine_mean {0};
+
+  for (int ind=0; ind<vec_in.size(); ind++){
+    double crrt_value = static_cast<double>(vec_in[ind]);
+    if (fabs(crrt_value - double_mean) < double_max_distance){
+      fine_mean += vec_in[ind] - coarse_mean;
     }
+  }
 
-    // compute the filtered mean
-    T filtered{0};
-    int nbr_valid {0};
+  fine_mean /= static_cast<T>(nbr_of_valid_points);
 
-    for (size_t index=0; index<vec_in.size(); index++){
-            T crrt_entry = vec_in[index] - mean_coarse;
-        if (verbose){
-              Serial.print(F("crrt_entry: ")); Serial.println(crrt_entry);
-        }
+  #if STAT_PROCESSING_VERBOSE
+    Serial.print(F("fine_mean = ")); Serial.println(fine_mean);
+  #endif
 
-        // do we have a valid value?
-        if (crrt_entry - mean <= n_sigma_native * std_estimate){
-                
-            if (verbose){
-                  Serial.println(F("we use it"));
-            }
-            nbr_valid += 1;
-            filtered += crrt_entry;
-        }
-
-        if (verbose){
-              Serial.print(F("filtered non normalized: ")); Serial.println(filtered);
-        }
-
-    }
-
-    if (verbose){
-          Serial.print(F("nbr_valid: ")); Serial.println(nbr_valid);
-    }
-
-    if (nbr_valid == 0){
-      return (mean + mean_coarse);
-    }
-
-    filtered = filtered / nbr_valid;
-    filtered += mean_coarse;
-
-    return filtered;
+  return (coarse_mean + fine_mean);
 }
+
+// TODO: change to modern looping
+// TODO: provide also the std in the same way
 
 #endif
