@@ -13,9 +13,12 @@ constexpr uint8_t backward_fft = 1;
 
 // parameters for generating the test signal
 constexpr float sample_rate {SAMPLES};
-constexpr float signal_frequency {4.0};
+constexpr float signal_frequency {8.0};
 constexpr float pi {3.141592653589793};
 constexpr float amplitude {1.0};
+
+constexpr float nyquist_frequency {sample_rate / 2.0};
+constexpr float frequency_resolution {sample_rate / SAMPLES};
 
 // Global variables for taking FFT: input and output
 // for RFFT, there are a bit of "hacks", see the discussion at: https://github.com/ARM-software/CMSIS_5/issues/1091
@@ -53,16 +56,20 @@ void setup() {
   Serial.println();
   Serial.println(F("booted"));
   Serial.println(F("illustrate rfft using CMSIS"));
+  Serial.print(F("input signal has amplitude ")); Serial.print(amplitude); Serial.print(F(" and frequency ")); Serial.print(signal_frequency); Serial.println(F("; signal duration is 1.0s"));
+  Serial.print(F("FFT has Nyquist frequency ")); Serial.print(nyquist_frequency); Serial.print(F(" and frequency resolution ")); Serial.println(frequency_resolution);
   Serial.println();
 
   // build the input signal
   for (int i=0; i<SAMPLES; i++){
-    fft_input[i] = amplitude * cos(2.0 * pi * signal_frequency * i / sample_rate + pi / 2.0);
+    fft_input[i] = amplitude * cos(2.0 * pi * signal_frequency * i * 1.0 / sample_rate + 0.125 * 2.0 * pi) + 0.05f;
   }
 
   Serial.println(F("input signal"));
   for (int i=0; i<SAMPLES; i++){
-    Serial.print(F("ind ")); serial_print_int_width_4(i); Serial.print(F(" : ")); serial_print_float_width_16_prec_8(fft_input[i]); Serial.println();
+    Serial.print(F("ind ")); serial_print_int_width_4(i);
+    Serial.print(F(" time: ")); serial_print_float_width_16_prec_8(i * 1.0 / sample_rate);
+    Serial.print(F(" : ")); serial_print_float_width_16_prec_8(fft_input[i]); Serial.println();
   }
   Serial.println(F("done writing input"));
   Serial.println();
@@ -77,8 +84,14 @@ void setup() {
   Serial.println();
 
   Serial.println(F("output signal"));
-  for (int i=0; i<SAMPLES; i++){
-    Serial.print(F("ind ")); serial_print_int_width_4(i); Serial.print(F(" : ")); serial_print_float_width_16_prec_8(fft_output[i]); Serial.println();
+  // FFT(f)[i] = conj[ FFT(f)[-i] ]
+  // FFT(f)[]
+  Serial.print(F("ind 0000 is packing FFT[0], the constant component, which is real constant component: ")); serial_print_float_width_16_prec_8(fft_output[0]); Serial.println();
+  Serial.print(F("ind 0001 is packing FFT[N/2], the nyquist frequency content,  which is real constant component: ")); serial_print_float_width_16_prec_8(fft_output[1]); Serial.println();
+  for (int i=2; i<SAMPLES; i++){
+    int frq_factor = (i) / 2;
+    Serial.print(F("ind ")); serial_print_int_width_4(i); Serial.print(F(" | frq [Hz]: ")); serial_print_float_width_16_prec_8(frq_factor * frequency_resolution);
+    Serial.print(F(" | ")); serial_print_float_width_16_prec_8(fft_output[i]); Serial.println();
   }
   Serial.println(F("done writing output"));
   Serial.println();
