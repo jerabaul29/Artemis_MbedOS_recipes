@@ -1,10 +1,15 @@
-#include "mbed.h"
+//#include "mbed.h"
 
-#include <Embedded_Template_Library.h>
+//#include <Embedded_Template_Library.h>
+
+#include "etl.h"
 
 #include "etl/array.h"
 #include "etl/circular_buffer.h"
 #include "etl/vector.h"
+
+#include "etl/mean.h"
+#include "etl/standard_deviation.h"
 
 //////////////////////////////////////////////////
 // helper functions
@@ -100,8 +105,16 @@ int main(){
   vector.push_back(31);
   vector.push_back(32);
   vector.push_back(33);
+  vector.push_back(34);
 
   print_vector(vector);
+
+  //////////////////////////////////////////////////
+  Serial.println(F("test of mean and std; compute on the previous vector"));
+
+  float mean = etl::mean(vector.begin(), vector.end());
+  
+  Serial.print(F("got mean ")); Serial.print(mean); Serial.println(F(" expected 32.5"));
 
   
 
