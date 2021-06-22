@@ -78,8 +78,8 @@ void setup() {
 
   // compute a FFT
   Serial.println(F("start init fast struct"));
-  // crrt_arm_status = arm_rfft_fast_init_f32(&crrt_arm_rfft_fast_instance_f32, SAMPLES);                          // get ready; this is generic, but may use quite a bit of memory as pulling all fft twiddle factors
-  crrt_arm_status = arm_rfft_32_fast_init_f32(&crrt_arm_rfft_fast_instance_f32);                          // get ready; this is less generic, specific to the size we use, but more memory efficient
+  crrt_arm_status = arm_rfft_fast_init_f32(&crrt_arm_rfft_fast_instance_f32, SAMPLES);                          // get ready; this is generic, but may use quite a bit of flash memory as pulling all fft twiddle factors
+  // crrt_arm_status = arm_rfft_32_fast_init_f32(&crrt_arm_rfft_fast_instance_f32);                          // get ready; this is less generic, specific to the size we use, but more flash memory efficient
   Serial.print(F("done init fast struct, status: ")); Serial.println(crrt_arm_status);
   Serial.println(F("start take FFT"));
   arm_rfft_fast_f32(&crrt_arm_rfft_fast_instance_f32, fft_input, fft_output, forward_fft);    // take the FFT; no status here!
