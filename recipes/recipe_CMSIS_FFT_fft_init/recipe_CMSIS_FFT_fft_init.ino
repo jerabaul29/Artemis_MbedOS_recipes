@@ -16,6 +16,8 @@ constexpr float sample_rate {SAMPLES};
 constexpr float signal_frequency {8.0};
 constexpr float pi {3.141592653589793};
 constexpr float amplitude {1.0};
+constexpr float phase { 0.125 * 2.0 * pi};
+constexpr float offset {0.5f};
 
 constexpr float nyquist_frequency {sample_rate / 2.0};
 constexpr float frequency_resolution {sample_rate / SAMPLES};
@@ -56,13 +58,13 @@ void setup() {
   Serial.println();
   Serial.println(F("booted"));
   Serial.println(F("illustrate rfft using CMSIS"));
-  Serial.print(F("input signal has amplitude ")); Serial.print(amplitude); Serial.print(F(" and frequency ")); Serial.print(signal_frequency); Serial.println(F("; signal duration is 1.0s"));
+  Serial.print(F("input signal has | amplitude ")); Serial.print(amplitude); Serial.print(F(" | frequency ")); Serial.print(signal_frequency); Serial.print(F(" | phase [rad] ")); Serial.print(phase); Serial.print(F(" ie [deg] ")); Serial.print(phase * 180.0f / pi); Serial.print(F(" | offset ")); Serial.print(offset); Serial.println(F(" | duration is 1.0s"));
   Serial.print(F("FFT has Nyquist frequency ")); Serial.print(nyquist_frequency); Serial.print(F(" and frequency resolution ")); Serial.println(frequency_resolution);
   Serial.println();
 
   // build the input signal
   for (int i=0; i<SAMPLES; i++){
-    fft_input[i] = amplitude * cos(2.0 * pi * signal_frequency * i * 1.0 / sample_rate + 0.125 * 2.0 * pi) + 0.05f;
+    fft_input[i] = amplitude * cos(2.0 * pi * signal_frequency * i * 1.0 / sample_rate + phase) + offset;
   }
 
   Serial.println(F("input signal"));
@@ -76,7 +78,8 @@ void setup() {
 
   // compute a FFT
   Serial.println(F("start init fast struct"));
-  crrt_arm_status = arm_rfft_fast_init_f32(&crrt_arm_rfft_fast_instance_f32, SAMPLES);                          // get ready
+  // crrt_arm_status = arm_rfft_fast_init_f32(&crrt_arm_rfft_fast_instance_f32, SAMPLES);                          // get ready; this is generic, but may use quite a bit of memory as pulling all fft twiddle factors
+  crrt_arm_status = arm_rfft_32_fast_init_f32(&crrt_arm_rfft_fast_instance_f32);                          // get ready; this is less generic, specific to the size we use, but more memory efficient
   Serial.print(F("done init fast struct, status: ")); Serial.println(crrt_arm_status);
   Serial.println(F("start take FFT"));
   arm_rfft_fast_f32(&crrt_arm_rfft_fast_instance_f32, fft_input, fft_output, forward_fft);    // take the FFT; no status here!
