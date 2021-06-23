@@ -12,12 +12,13 @@ constexpr uint8_t forward_fft = 0;
 constexpr uint8_t backward_fft = 1;
 
 // parameters for generating the test signal
-constexpr float sample_rate {SAMPLES};
-constexpr float signal_frequency {8.0};
+constexpr float sample_duration_seconds {2.0};
+constexpr float sample_rate {SAMPLES / sample_duration_seconds};
+constexpr float signal_frequency {3.0};
 constexpr float pi {3.141592653589793};
 constexpr float amplitude {1.0};
-constexpr float phase { 0.125 * 2.0 * pi};
-constexpr float offset {0.5f};
+constexpr float phase {0.0f * pi / 180.0f};
+constexpr float offset {0.0f};
 
 constexpr float nyquist_frequency {sample_rate / 2.0};
 constexpr float frequency_resolution {sample_rate / SAMPLES};
@@ -58,22 +59,34 @@ void setup() {
   Serial.println();
   Serial.println(F("booted"));
   Serial.println(F("illustrate rfft using CMSIS"));
-  Serial.print(F("input signal has | amplitude ")); Serial.print(amplitude); Serial.print(F(" | frequency ")); Serial.print(signal_frequency); Serial.print(F(" | phase [rad] ")); Serial.print(phase); Serial.print(F(" ie [deg] ")); Serial.print(phase * 180.0f / pi); Serial.print(F(" | offset ")); Serial.print(offset); Serial.println(F(" | duration is 1.0s"));
-  Serial.print(F("FFT has Nyquist frequency ")); Serial.print(nyquist_frequency); Serial.print(F(" and frequency resolution ")); Serial.println(frequency_resolution);
+
+  Serial.println();
+  Serial.print(F("sample_duration_seconds ")); Serial.print(sample_duration_seconds); Serial.print(F(" | SAMPLES ")); Serial.print(SAMPLES); Serial.print(F(" | sample_rate ")); Serial.print(sample_rate); Serial.println();
+  Serial.print(F("input signal has | amplitude ")); Serial.print(amplitude); Serial.print(F(" | frequency [Hz] ")); Serial.print(signal_frequency); Serial.print(F(" | phase [rad] ")); Serial.print(phase); Serial.print(F(" ie [deg] ")); Serial.print(phase * 180.0f / pi); Serial.print(F(" | offset ")); Serial.print(offset); Serial.println();
+  Serial.print(F("FFT has | Nyquist frequency [Hz] ")); Serial.print(nyquist_frequency); Serial.print(F(" | frequency resolution [Hz] ")); Serial.print(frequency_resolution); Serial.println();
   Serial.println();
 
   // build the input signal
   for (int i=0; i<SAMPLES; i++){
-    fft_input[i] = amplitude * cos(2.0 * pi * signal_frequency * i * 1.0 / sample_rate + phase) + offset;
+    fft_input[i] = amplitude * cos(2.0 * pi * signal_frequency * i / sample_rate + phase) + offset;
   }
 
   Serial.println(F("input signal"));
+  float sum_of_signal = 0.0f;
+  float sum_of_squares_signal = 0.0f;
   for (int i=0; i<SAMPLES; i++){
     Serial.print(F("ind ")); serial_print_int_width_4(i);
     Serial.print(F(" time: ")); serial_print_float_width_16_prec_8(i * 1.0 / sample_rate);
     Serial.print(F(" : ")); serial_print_float_width_16_prec_8(fft_input[i]); Serial.println();
+    sum_of_signal += fft_input[i];
+    sum_of_squares_signal += fft_input[i] * fft_input[i];
   }
   Serial.println(F("done writing input"));
+  Serial.print(F("sum_of_signal: ")); serial_print_float_width_16_prec_8(sum_of_signal); Serial.println();
+  Serial.print(F("sum_of_squares_signal: ")); serial_print_float_width_16_prec_8(sum_of_squares_signal); Serial.println();
+  Serial.print(F("rms: ")); serial_print_float_width_16_prec_8(sqrt(sum_of_squares_signal / static_cast<float>(SAMPLES))); Serial.println();
+  Serial.print(F("var: ")); serial_print_float_width_16_prec_8(sum_of_squares_signal / static_cast<float>(SAMPLES) - sum_of_signal * sum_of_signal / static_cast<float>(SAMPLES) / static_cast<float>(SAMPLES)); Serial.println();
+  Serial.print(F("std: ")); serial_print_float_width_16_prec_8(sqrt(sum_of_squares_signal / static_cast<float>(SAMPLES) - sum_of_signal * sum_of_signal / static_cast<float>(SAMPLES) / static_cast<float>(SAMPLES))); Serial.println();
   Serial.println();
 
   // compute a FFT
@@ -86,9 +99,7 @@ void setup() {
   Serial.print(F("done take FFT")); Serial.println();
   Serial.println();
 
-  Serial.println(F("output signal"));
-  // FFT(f)[i] = conj[ FFT(f)[-i] ]
-  // FFT(f)[]
+  Serial.println(F("output fft"));
   Serial.print(F("ind 0000 is packing FFT[0], the constant component, which is real constant component: ")); serial_print_float_width_16_prec_8(fft_output[0]); Serial.println();
   Serial.print(F("ind 0001 is packing FFT[N/2], the nyquist frequency content,  which is real constant component: ")); serial_print_float_width_16_prec_8(fft_output[1]); Serial.println();
   for (int i=2; i<SAMPLES; i++){
@@ -96,7 +107,25 @@ void setup() {
     Serial.print(F("ind ")); serial_print_int_width_4(i); Serial.print(F(" | frq [Hz]: ")); serial_print_float_width_16_prec_8(frq_factor * frequency_resolution);
     Serial.print(F(" | ")); serial_print_float_width_16_prec_8(fft_output[i]); Serial.println();
   }
-  Serial.println(F("done writing output"));
+  Serial.println(F("done output fft"));
+  Serial.println();
+
+  Serial.println(F("output power spectrum: fft_real * fft_real + fft_img * fft_img for each frequency"));
+  Serial.print(F("ind 0000 is packing FFT[0], the constant component, which is real constant component; its associated energy is: ")); serial_print_float_width_16_prec_8(fft_output[0] * fft_output[0]); Serial.println();
+  Serial.print(F("ind 0001 is packing FFT[N/2], the nyquist frequency content, which is real constant component; its associated energy is: ")); serial_print_float_width_16_prec_8(fft_output[1] * fft_output[1]); Serial.println();
+  float total_energy_content = 0.0f;
+  float m0 = 0.0f;
+  for (int i=1; i<SAMPLES/2; i++){
+    float crrt_energy = fft_output[2*i] * fft_output[2*i] + fft_output[2*i + 1] * fft_output[2*i + 1];
+    total_energy_content += crrt_energy;
+    m0 += 2.0 * crrt_energy / SAMPLES / SAMPLES;
+    Serial.print(F("frq ")); serial_print_float_width_16_prec_8(i*frequency_resolution); Serial.print(F(" | energy ")); Serial.println(crrt_energy);
+  }
+  Serial.print(F("total_energy_content ")); serial_print_float_width_16_prec_8(total_energy_content); Serial.println();
+  Serial.print(F("m0 ")); serial_print_float_width_16_prec_8(m0); Serial.println();
+  Serial.print(F("sqrt(m0) ")); serial_print_float_width_16_prec_8(sqrt(m0)); Serial.println();
+  Serial.println(F("done output fft power spectrum"));
+
   Serial.println();
 }
 
