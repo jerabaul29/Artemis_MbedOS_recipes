@@ -58,6 +58,8 @@ void setup(void) {
   ArtemisWire.setClock(1000000);
   delay(500);
 
+  // comment / uncomment this part to deactivate / activate the swich
+  /*
   Serial.println(F("Sparkfun power switch start!"));
   while (true){
     if (mySwitch.begin(ArtemisWire) == false){
@@ -77,6 +79,7 @@ void setup(void) {
   mySwitch.pinMode(1, INPUT);
   mySwitch.pinMode(2, INPUT);
   delay(500);
+  */
 
   Serial.println("Adafruit ISM330DHCX start!");
   while (true){
