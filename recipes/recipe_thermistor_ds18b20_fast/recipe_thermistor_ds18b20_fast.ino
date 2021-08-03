@@ -2,6 +2,7 @@
 #include <OneWire.h>
 #include "etl.h"
 #include "etl/vector.h"
+#include "etl/algorithm.h"
 
 #define ONE_WIRE_PIN 35  // the data pin; I suggest to put a 100 Ohm between the pin and the sensors; this way, if a cable is cut / shorted, will not burn the pin
 #define ONE_WIRE_POWER 4  // the power pin; use a digital pin to be able to switch power on and off
@@ -15,6 +16,7 @@ OneWire ds(ONE_WIRE_PIN);  // on pin 10 (a pullup resistor is necessary; value m
 
 using Address = byte[8];
 etl::vector<uint64_t, MAX_NBR_OF_SENSORS> vector_of_ids;
+etl::vector<float, MAX_NBR_OF_SENSORS> vector_of_measurements;
 
 void address_to_uint64_t(Address & addr_in, uint64_t & uint64_result){
   uint64_result = 0;
@@ -29,12 +31,19 @@ void uint64_t_to_address(uint64_t const & uint64_in, Address & addr_out){
   }
 }
 
-void print_uint64(uint64_t num){
+void print_uint64(uint64_t const & num){
   uint32_t low = num % 0xFFFFFFFF; 
   uint32_t high = (num >> 32) % 0xFFFFFFFF;
  
-  Serial.print(low);
   Serial.print(high);
+  Serial.print(low);
+}
+
+void print_address(Address const & addr){
+    for( int i = 0; i < 8; i++) {
+      Serial.print(addr[i], HEX);
+      Serial.write(' ');
+    }
 }
 
 void look_for_sensors(etl::ivector<uint64_t> & vec_in){
@@ -48,19 +57,17 @@ void look_for_sensors(etl::ivector<uint64_t> & vec_in){
 
   while (true){
     
-    if ( !ds.search(crrt_addr)) {
+    if ( !ds.search(crrt_addr) ) {
       Serial.println("No more addresses.");
       ds.reset_search();
       delay(250);
-      return;
+
+      break;
     }
 
     Serial.println(F("found new address..."));
     Serial.print("ROM =");
-    for( int i = 0; i < 8; i++) {
-      Serial.write(' ');
-      Serial.print(crrt_addr[i], HEX);
-    }
+    print_address(crrt_addr);
     Serial.println();
 
     address_to_uint64_t(crrt_addr, crrt_id);
@@ -86,26 +93,113 @@ void look_for_sensors(etl::ivector<uint64_t> & vec_in){
     // the first ROM byte indicates which chip
     switch (crrt_addr[0]) {
       case 0x10:
-        Serial.println("  Chip = DS18S20");  // or old DS1820
+        Serial.println("  WARNING: Chip = DS18S20");  // or old DS1820
         break;
       case 0x28:
-        Serial.println("  Chip = DS18B20");
+        Serial.println("  CORRECT: Chip = DS18B20");
+        vec_in.push_back(crrt_id);
         break;
       case 0x22:
-        Serial.println("  Chip = DS1822");
+        Serial.println("  WARNING: Chip = DS1822");
         break;
       default:
-        Serial.println("Device is not a DS18x20 family device.");
+        Serial.println("EROR: Device is not a DS18x20 family device.");
         continue;
     } 
-
-    vec_in.push_back(crrt_id);
   }
-  
+
+  // we sort greater first; i.e., the sensors with greater IDs are sorted first;
+  // i.e., if the thermistor string have greater IDs higher up, then the sensors are sorted from higher up to lower down
+  etl::sort(vec_in.begin(), vec_in.end(), std::greater<uint64_t>());
+
+  Serial.println(F("sorted list of IDs"));
+
+  for (auto const & crrt_elem : vec_in){
+    print_uint64(crrt_elem); Serial.println();
+  }
+
+  return;
+}
+
+
+void measure_all_sensors(etl::ivector<uint64_t> const & vec_sensors_IDs, etl::ivector<float> & vector_of_measurements){
+  Address crrt_address;
+  vector_of_measurements.clear();
+  byte present = 0;
+  byte data[12];
+  float celsius;
+  byte crc;
+
+  // ask each sensor to start new measurement
+  Serial.println(F("ask to start conversion..."));
+  for (auto & crrt_id : vec_sensors_IDs){
+    uint64_t_to_address(crrt_id, crrt_address);
+    print_address(crrt_address); Serial.println();
+
+    ds.reset();
+    ds.select(crrt_address);
+    ds.write(0x44, 1);        // start conversion, with parasite power on at the end
+    delay(10);
+  }
+
+  // wait for the conversion to take place
+  // in theory 750ms is enough, but take no chance
+  Serial.println(F("wait for conversions to take place"));
+  delay(1000);
+
+  // collect the output of each sensor
+  Serial.println(F("collect results..."));
+  for (auto & crrt_id : vec_sensors_IDs){
+    uint64_t_to_address(crrt_id, crrt_address);
+    print_address(crrt_address); Serial.println();
+
+    present = ds.reset();
+    ds.select(crrt_address);    
+    ds.write(0xBE);         // Read Scratchpad
+
+    Serial.print("  Data = ");
+    Serial.print(present, HEX);
+    Serial.print(" ");
+    for ( int i = 0; i < 9; i++) {           // we need 9 bytes
+      data[i] = ds.read();
+      Serial.print(data[i], HEX);
+      Serial.print(" ");
+    }
+    Serial.print(" CRC=");
+    crc = OneWire::crc8(data, 8);
+    Serial.print(crc, HEX);
+    if (crc != data[8]){
+      Serial.println(F(" ERROR: non matching CRC"));
+    }
+    else{
+      Serial.println(F(" CRC OK"));
+    }
+
+    // Convert the data to actual temperature
+    // because the result is a 16 bit signed integer, it should
+    // be stored to an "int16_t" type, which is always 16 bits
+    // even when compiled on a 32 bit processor.
+    int16_t raw = (data[1] << 8) | data[0];
+    byte cfg = (data[4] & 0x60);
+    // at lower res, the low bits are undefined, so let's zero them
+    if (cfg == 0x00) {raw = raw & ~7; Serial.println(F("  WARNING: 9 bit res"));}  // 9 bit resolution, 93.75 ms
+    else if (cfg == 0x20) {raw = raw & ~3; Serial.println(F("  WARNING: 10 bit res"));} // 10 bit res, 187.5 ms
+    else if (cfg == 0x40) {raw = raw & ~1; Serial.println(F("  WARNING: 11 bit res"));} // 11 bit res, 375 ms
+    else if (cfg == 0x60) {Serial.println(F("  OK: 12 bits resolution"));}
+    else {Serial.println(F("  ERROR: unknown resolution config!"));}
+
+    celsius = (float)raw / 16.0;
+    Serial.print("  Temperature = ");
+    Serial.print(celsius);
+    Serial.print(" Celsius");
+    Serial.println();
+  }
 }
 
 void setup(void) {
-  Serial.begin(9600);
+  delay(1000);
+
+  Serial.begin(1000000);
   delay(100);
   Serial.println(F("----- BOOTED -----"));
 
@@ -121,105 +215,12 @@ void setup(void) {
 
   Serial.println(F("look for sensors..."));
   look_for_sensors(vector_of_ids);
-
+  Serial.println();
 }
 
 
 void loop(void) {
-  byte i;
-  byte present = 0;
-  byte type_s;
-  byte data[12];
-  byte addr[8];
-  float celsius, fahrenheit;
-  
-  if ( !ds.search(addr)) {
-    Serial.println("No more addresses.");
-    Serial.println();
-    ds.reset_search();
-    delay(250);
-    return;
-  }
-  
-  Serial.print("ROM =");
-  for( i = 0; i < 8; i++) {
-    Serial.write(' ');
-    Serial.print(addr[i], HEX);
-  }
-
-  if (OneWire::crc8(addr, 7) != addr[7]) {
-      Serial.println("CRC is not valid!");
-      return;
-  }
+  Serial.println(F("measure all sensors..."));
+  measure_all_sensors(vector_of_ids, vector_of_measurements);
   Serial.println();
- 
-  // the first ROM byte indicates which chip
-  switch (addr[0]) {
-    case 0x10:
-      Serial.println("  Chip = DS18S20");  // or old DS1820
-      type_s = 1;
-      break;
-    case 0x28:
-      Serial.println("  Chip = DS18B20");
-      type_s = 0;
-      break;
-    case 0x22:
-      Serial.println("  Chip = DS1822");
-      type_s = 0;
-      break;
-    default:
-      Serial.println("Device is not a DS18x20 family device.");
-      return;
-  } 
-
-  ds.reset();
-  ds.select(addr);
-  ds.write(0x44, 1);        // start conversion, with parasite power on at the end
-  
-  delay(1000);     // maybe 750ms is enough, maybe not
-  // we might do a ds.depower() here, but the reset will take care of it.
-  
-  present = ds.reset();
-  ds.select(addr);    
-  ds.write(0xBE);         // Read Scratchpad
-
-  Serial.print("  Data = ");
-  Serial.print(present, HEX);
-  Serial.print(" ");
-  for ( i = 0; i < 9; i++) {           // we need 9 bytes
-    data[i] = ds.read();
-    Serial.print(data[i], HEX);
-    Serial.print(" ");
-  }
-  Serial.print(" CRC=");
-  Serial.print(OneWire::crc8(data, 8), HEX);
-  Serial.println();
-
-  // Convert the data to actual temperature
-  // because the result is a 16 bit signed integer, it should
-  // be stored to an "int16_t" type, which is always 16 bits
-  // even when compiled on a 32 bit processor.
-  int16_t raw = (data[1] << 8) | data[0];
-  if (type_s) {
-    raw = raw << 3; // 9 bit resolution default
-    if (data[7] == 0x10) {
-      // "count remain" gives full 12 bit resolution
-      raw = (raw & 0xFFF0) + 12 - data[6];
-    }
-  } else {
-    byte cfg = (data[4] & 0x60);
-    // at lower res, the low bits are undefined, so let's zero them
-    if (cfg == 0x00) {raw = raw & ~7; Serial.println(F("9 bit res"));}  // 9 bit resolution, 93.75 ms
-    else if (cfg == 0x20) {raw = raw & ~3; Serial.println(F("10 bit res"));} // 10 bit res, 187.5 ms
-    else if (cfg == 0x40) {raw = raw & ~1; Serial.println(F("11 bit res"));} // 11 bit res, 375 ms
-    else {Serial.println(F("12 bits resolution"));}
-    //// default is 12 bit resolution, 750 ms conversion time
-  }
-  celsius = (float)raw / 16.0;
-  fahrenheit = celsius * 1.8 + 32.0;
-  Serial.print("  Temperature = ");
-  Serial.print(celsius);
-  Serial.print(" Celsius, ");
-  Serial.print(fahrenheit);
-  Serial.println(" Fahrenheit");
 }
