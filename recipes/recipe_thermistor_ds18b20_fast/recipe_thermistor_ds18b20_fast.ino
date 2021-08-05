@@ -46,6 +46,22 @@ void print_address(Address const & addr){
     }
 }
 
+void uint64_t_to_6bits_int_id(uint64_t const & uint64_in, uint8_t & uint8_6bits_id){
+  Address crrt_address;
+  uint64_t_to_address(uint64_in, crrt_address);
+
+  // we know that:
+  // the first byte is the "kind", should be 0x28
+  // the next 6 bytes are the serial number
+  // the LS bytes are first; then end is still 0x00 0x00 (as production has not gone so far)
+  // the last byte is the CRC
+  // so, use the 6 LSBs of the LS byte of the serial number (these are the ones that "rotate" fastest)
+
+  byte byte_to_use = crrt_address[1];
+  byte byte_result = byte_to_use & 0b00111111;
+  uint8_6bits_id = byte_result;
+}
+
 void look_for_sensors(etl::ivector<uint64_t> & vec_in){
   Address crrt_addr;
   uint64_t crrt_id;
@@ -72,6 +88,10 @@ void look_for_sensors(etl::ivector<uint64_t> & vec_in){
 
     address_to_uint64_t(crrt_addr, crrt_id);
     Serial.print(F("ID = ")); print_uint64(crrt_id); Serial.println();
+
+    uint8_t id_with_6_bits {0};
+    uint64_t_to_6bits_int_id(crrt_id, id_with_6_bits);
+    Serial.print(F("6 bits ID: 0x")); Serial.print(id_with_6_bits, HEX); Serial.print(F(" i.e. ")); Serial.println(id_with_6_bits);
 
     // just to test that ID conversion to addr and back work
     uint64_t_to_address(crrt_id, test_addr);
@@ -112,10 +132,12 @@ void look_for_sensors(etl::ivector<uint64_t> & vec_in){
   // i.e., if the thermistor string have greater IDs higher up, then the sensors are sorted from higher up to lower down
   etl::sort(vec_in.begin(), vec_in.end(), std::greater<uint64_t>());
 
-  Serial.println(F("sorted list of IDs"));
+  Serial.println(F("sorted list of IDs; note that ordering by 6 LSBs is not identical to ordering by true ID"));
 
   for (auto const & crrt_elem : vec_in){
-    print_uint64(crrt_elem); Serial.println();
+    uint8_t reduced_6bits_id;
+    uint64_t_to_6bits_int_id(crrt_elem, reduced_6bits_id);
+    print_uint64(crrt_elem); Serial.print(F(" reduced 6 bits ID (bin): ")); Serial.println(reduced_6bits_id);
   }
 
   return;
