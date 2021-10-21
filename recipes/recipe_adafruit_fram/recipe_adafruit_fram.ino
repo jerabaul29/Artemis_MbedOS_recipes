@@ -13,15 +13,22 @@ for using FRAM (from Adafruit).
 
 // ---------------------------------------------------------------------------------
 
-#define CS_PIN 2
+#define CS_PIN 10
 #define SPI_SPEED 1000000
 #define SPI_ORDER MSBFIRST
 #define SPI_MODE SPI_MODE0
 
+SPIClass my_spi(0); //This is default and automatically defined on RedBoard/ATP/Nano. Access using pins labeled SCK/MISO/MOSI (connects to pads 5/6/7 on module).
+// SPIClass my_spi(1); //Use IO Master 1 on pads 8/9/10. See schematic of your board for pin locations.
+// SPIClass mySPI(2); //Use IO Master 2 on pads 27/25/28
+// SPIClass anotherSPI(3); //Use IO Master 3 on pads 42/43/44
+// SPIClass SPI4(4); //Use IO Master 4 on pads 39/40/38
+// SPIClass SPI5(5); //Use IO Master 5 on pads 48/49/47
+
 // ---------------------------------------------------------------------------------
 
 SPISettings mySettings(SPI_SPEED, SPI_ORDER, SPI_MODE);
-Adafruit_FRAM_SPI fram = Adafruit_FRAM_SPI(CS_PIN);  // use hardware SPI
+Adafruit_FRAM_SPI fram = Adafruit_FRAM_SPI(CS_PIN, &my_spi);
 
 uint8_t           addrSizeInBytes = 2; //Default to address size of two bytes
 uint32_t          memSize;

@@ -5,4 +5,4 @@ Initially installing the FRAM adafruit library does not allow to compile for Art
 To fix this, a simple solution is to disable the constructors that require pin mapping in both the FRAM and busIO libraries from Adafruit. This is done for example on these forks of their repos (make sure to use the fix branches!):
 
 - https://github.com/jerabaul29/Adafruit_BusIO/tree/fix/no_mapping_needed
-- https://github.com/jerabaul29/Adafruit_FRAM_SPI/tree/fix/no_mapping_needed
+- https://github.com/jerabaul29/Adafruit_BusIO/tree/fix/SPI_with_Artemis
